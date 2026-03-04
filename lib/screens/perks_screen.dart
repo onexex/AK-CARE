@@ -30,11 +30,11 @@ class PerksScreen extends StatelessWidget {
         foregroundColor: Colors.white,
         elevation: 0,
       ),
-      // Ginamit natin ang ListView para mas smooth ang scrolling at touch detection
+       
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          // --- HIGHLIGHT PERK ---
+          
           _buildFeaturedPerk(),
 
           const SizedBox(height: 25),
@@ -42,10 +42,10 @@ class PerksScreen extends StatelessWidget {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 15),
 
-          // --- BENTO GRID ---
+         
           GridView.count(
-            shrinkWrap: true, // Importante ito para gumana sa loob ng ListView
-            physics: const NeverScrollableScrollPhysics(), // Disable grid scroll
+            shrinkWrap: true,  
+            physics: const NeverScrollableScrollPhysics(),  
             crossAxisCount: 2,
             crossAxisSpacing: 15,
             mainAxisSpacing: 15,
