@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "akop_pulse_app",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart" 
+        }
+    ]
+
+}
