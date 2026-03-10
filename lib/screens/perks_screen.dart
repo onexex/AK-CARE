@@ -25,8 +25,6 @@ class PerksScreen extends StatelessWidget {
     }
   }
 
-  
-
   void _showScheduleForm(BuildContext context) {
     // 1. Kuhanin ang messenger gamit ang MAIN context ng PerksScreen
     final rootMessenger = ScaffoldMessenger.of(context);
@@ -160,18 +158,15 @@ class PerksScreen extends StatelessWidget {
                                 "phone_number": phone,
                               },
                             ).timeout(const Duration(seconds: 10));  
-
                             debugPrint("SERVER RESPONSE: ${response.body}");
-
                             final result = json.decode(response.body);
-
                             if (result['status'] == 'success') {
                                
                               Navigator.pop(modalContext); 
                               _showTopNotification(
                                   context, 
                                   "Request submitted! We will contact you soon.", 
-                                  const Color.fromARGB(255, 36, 154, 25)
+                                   Color.fromARGB(255, 36, 154, 25)
                                 );
 
                               
@@ -325,49 +320,19 @@ class PerksScreen extends StatelessWidget {
     );
   }
 
-  // Widget _buildPerkCard(
-  //     String title, IconData icon, Color color, String sub, VoidCallback onTap) {
-  //   return InkWell(
-  //     onTap: onTap,
-  //     borderRadius: BorderRadius.circular(20),
-  //     child: Container(
-  //       padding: const EdgeInsets.all(15),
-  //       decoration: BoxDecoration(
-  //         color: Colors.white,
-  //         borderRadius: BorderRadius.circular(20),
-  //         border: Border.all(color: Colors.grey[200]!),
-  //       ),
-  //       child: Column(
-  //         mainAxisAlignment: MainAxisAlignment.center,
-  //         crossAxisAlignment: CrossAxisAlignment.start,
-  //         children: [
-  //           Icon(icon, color: color, size: 30),
-  //           const SizedBox(height: 10),
-  //           Text(title,
-  //               style:
-  //                   const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-  //           const SizedBox(height: 4),
-  //           Text(sub,
-  //               style: const TextStyle(fontSize: 11, color: Colors.grey)),
-  //         ],
-  //       ),
-  //     ),
-  //   );
-  // }
-
   Widget _buildPerkCard(
     String title, IconData icon, Color color, String sub, VoidCallback onTap) {
-  return Material( // Idinagdag para sa mas magandang ripple effect
+  return Material( 
     color: Colors.transparent,
     child: InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(25),
       child: Container(
-        padding: const EdgeInsets.all(18), // Ginawang 18 para mas maluwag
+        padding: const EdgeInsets.all(18), 
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(25),
-          border: Border.all(color: Colors.grey[100]!), // Mas subtle na border
+          border: Border.all(color: Colors.grey[100]!), 
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.03),
@@ -380,7 +345,7 @@ class PerksScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icon Container para may background na light color
+            
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -449,46 +414,43 @@ class PerksScreen extends StatelessWidget {
     );
   }
 
-
   void _showTopNotification(BuildContext context, String message, Color color) {
-  final overlay = Overlay.of(context);
-  final overlayEntry = OverlayEntry(
-    builder: (context) => Positioned(
-      top: MediaQuery.of(context).padding.top + 10, // Sa itaas ng screen (below status bar)
-      left: 20,
-      right: 20,
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(15),
-            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.info_outline, color: Colors.white),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  message,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+    final overlay = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 10, // Sa itaas ng screen (below status bar)
+        left: 20,
+        right: 20,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(15),
+              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
 
-  // Ipasok ang notification sa overlay
-  overlay.insert(overlayEntry);
+    overlay.insert(overlayEntry);
 
-  // Automatic na tanggalin pagkatapos ng 3 seconds
-  Future.delayed(const Duration(seconds: 3), () {
-    overlayEntry.remove();
-  });
-}
+    Future.delayed(const Duration(seconds: 3), () {
+      overlayEntry.remove();
+    });
+  }
 }

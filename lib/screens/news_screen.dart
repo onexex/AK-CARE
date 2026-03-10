@@ -49,10 +49,10 @@ class _NewsScreenState extends State<NewsScreen> {
   final List<String> categories = ["All", "Health", "Announcements", "Maritime", "System"];
   late Future<List<NewsArticle>> _newsFuture;
   
-  // --- MGA PANG-SEARCH ---
-  final TextEditingController _searchController = TextEditingController(); // Controller para sa search bar
-  String _searchQuery = ""; // Variable para itabi ang hinahanap ng user
-  List<NewsArticle> _allNews = []; // Lalagyan ng lahat ng balita mula sa backend
+  
+  final TextEditingController _searchController = TextEditingController(); 
+  String _searchQuery = ""; 
+  List<NewsArticle> _allNews = []; 
 
   @override
   void initState() {
@@ -62,21 +62,21 @@ class _NewsScreenState extends State<NewsScreen> {
 
   @override
   void dispose() {
-    _searchController.dispose(); // Importante: I-dispose ang controller
+    _searchController.dispose(); 
     super.dispose();
   }
 
-  // --- FUNCTION PARA SA PULL-TO-REFRESH ---
+  
   Future<void> _onRefresh() async {
     setState(() {
-      _searchController.clear(); // Linisin ang search bar kapag nag-refresh
+      _searchController.clear(); 
       _searchQuery = "";
       _newsFuture = fetchNews();
     });
     await _newsFuture;
   }
 
-  // 2. FUNCTION PARA KUMUHA NG BALITA MULA SA PHP BACKEND
+ 
   Future<List<NewsArticle>> fetchNews() async {
     try {
      final response = await http.get(
@@ -85,7 +85,7 @@ class _NewsScreenState extends State<NewsScreen> {
 
       if (response.statusCode == 200) {
         List<dynamic> data = json.decode(response.body);
-        _allNews = data.map((item) => NewsArticle.fromJson(item)).toList(); // Itabi ang lahat ng balita
+        _allNews = data.map((item) => NewsArticle.fromJson(item)).toList(); 
         return _allNews;
       } else {
         throw Exception('Failed to load news');

@@ -119,7 +119,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: () => _cancelRequest(req['id'].toString()),
+                  onPressed: () => _cancelRequest(req['request_id'].toString()),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red[50],
                     foregroundColor: Colors.red,
@@ -247,7 +247,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text("Preferred: ${req['preferred_date']}"),
-                                Text("ID: #${req['id']}", style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                Text("ID: #${req['request_id']}", style: const TextStyle(fontSize: 10, color: Colors.grey)),
                               ],
                             ),
                           ),
