@@ -3,6 +3,14 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/config.dart';
+import '../design_system/app_colors.dart';
+import '../design_system/app_radius.dart';
+import '../design_system/app_spacing.dart';
+import '../design_system/app_typography.dart';
+import '../design_system/app_elevation.dart';
+import '../widgets/app_empty_state.dart';
+import '../widgets/app_status_badge.dart';
+import '../widgets/app_dialog.dart';
 
 class RequestStatusScreen extends StatefulWidget {
   const RequestStatusScreen({super.key});
@@ -12,8 +20,10 @@ class RequestStatusScreen extends StatefulWidget {
 }
 
 class _RequestStatusScreenState extends State<RequestStatusScreen> {
-  List<dynamic> requests = [];
-  bool isLoading = true;
+  List<dynamic> _requests = [];
+  bool _isLoading = true;
+  String _selectedFilter = 'All';
+  final _filters = ['All', 'Pending', 'Confirmed', 'Completed'];
 
   @override
   void initState() {
@@ -23,258 +33,341 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
 
   Future<void> _fetchRequests() async {
     if (!mounted) return;
-    setState(() => isLoading = true);
-
+    setState(() => _isLoading = true);
     try {
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? userJson = prefs.getString('user_session');
-
-      if (userJson != null) {
-        Map<String, dynamic> userData = json.decode(userJson);
-        // Ginagamit ang 'contact' gaya ng nasa code mo
-        String userId = userData['contact'].toString();
-
+      final prefs = await SharedPreferences.getInstance();
+      final json = prefs.getString('user_session');
+      if (json != null) {
+        final user = jsonDecode(json);
+        final userId = user['contact'].toString();
         final response = await http.get(
-          Uri.parse("${AppConfig.baseUrl}/get_my_requests.php?user_id=$userId"),
+          Uri.parse('${AppConfig.baseUrl}/get_my_requests.php?user_id=$userId'),
         ).timeout(const Duration(seconds: 10));
-
         if (response.statusCode == 200) {
-          final result = json.decode(response.body);
+          final result = jsonDecode(response.body);
           if (result['status'] == 'success') {
             setState(() {
-              requests = result['data'];
-              isLoading = false;
+              _requests = result['data'] ?? [];
+              _isLoading = false;
             });
-          } else {
-            throw Exception(result['message']);
+            return;
           }
-        } else {
-          throw Exception("Server Error: ${response.statusCode}");
         }
+        throw Exception('Server error');
       }
-    } catch (e) {
-      debugPrint("Error fetching requests: $e");
+    } catch (_) {
       if (mounted) {
-        setState(() => isLoading = false);
-        _showTopNotification(context, "Connection Error: Check your internet.", Colors.red);
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Connection error. Check your internet.'),
+              backgroundColor: AppColors.error,
+              behavior: SnackBarBehavior.floating),
+        );
       }
     }
   }
 
-  // --- CANCEL REQUEST LOGIC ---
   Future<void> _cancelRequest(String requestId) async {
-    // Isara ang modal bago simulan ang request
-    Navigator.pop(context);
-    
-    setState(() => isLoading = true);
+    final confirmed = await AppDialog.show(
+      context: context,
+      title: 'Cancel Request',
+      message:
+          'Are you sure you want to cancel this consultation request? This action cannot be undone.',
+      confirmLabel: 'Yes, Cancel',
+      isDestructive: true,
+      icon: Icons.cancel_outlined,
+    );
+    if (confirmed != true || !mounted) return;
 
+    setState(() => _isLoading = true);
     try {
       final response = await http.post(
-        Uri.parse("${AppConfig.baseUrl}/cancel_request.php"),
-        body: {"id": requestId},
+        Uri.parse('${AppConfig.baseUrl}/cancel_request.php'),
+        body: {'id': requestId},
       ).timeout(const Duration(seconds: 10));
-
-      final result = json.decode(response.body);
-      
+      final result = jsonDecode(response.body);
       if (result['status'] == 'success') {
-        _showTopNotification(context, "Request cancelled successfully.", Colors.orange);
-        _fetchRequests(); // Refresh the list
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Request cancelled successfully.'),
+              backgroundColor: AppColors.success,
+              behavior: SnackBarBehavior.floating),
+        );
+        _fetchRequests();
       } else {
-        _showTopNotification(context, result['message'], Colors.red);
-        setState(() => isLoading = false);
+        throw Exception(result['message'] ?? 'Failed');
       }
     } catch (e) {
-      setState(() => isLoading = false);
-      _showTopNotification(context, "Error: Could not cancel request.", Colors.red);
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Error: Could not cancel request. $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating),
+      );
     }
   }
 
-  // --- SHOW DETAILS MODAL ---
-  void _showRequestDetails(Map<String, dynamic> req) {
-    String status = req['status'] ?? 'Pending';
-
+  void _showDetails(Map<String, dynamic> req) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(25),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.55,
+        maxChildSize: 0.85,
+        minChildSize: 0.35,
+        expand: false,
+        builder: (context, scrollController) => ListView(
+          controller: scrollController,
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xxl, 0, AppSpacing.xxl, AppSpacing.xxxl),
           children: [
-            const Text("Request Details", 
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const Divider(height: 30),
-            _buildDetailRow("Reason", req['consultation_reason']),
-            _buildDetailRow("Preferred Date", req['preferred_date']),
-            _buildDetailRow("Status", status.toUpperCase(), 
-                color: _getStatusColor(status), isBold: true),
-            const SizedBox(height: 30),
-            
-            // LALABAS LANG ITONG BUTTON KUNG PENDING
-            if (status.toLowerCase() == 'pending')
+            Row(
+              children: [
+                Text('Request Details',
+                    style: AppTypography.titleLarge
+                        .copyWith(color: AppColors.neutral100)),
+                const Spacer(),
+                AppStatusBadge.fromStatus(context, req['status'] ?? 'Pending'),
+              ],
+            ),
+            const Divider(height: AppSpacing.xxxl),
+            _detailRow('Reason', req['consultation_reason'] ?? 'N/A'),
+            _detailRow('Preferred Date', req['preferred_date'] ?? 'N/A'),
+            _detailRow('Request ID', '#${req['request_id'] ?? 'N/A'}'),
+            _detailRow(
+                'Status', (req['status'] ?? 'Pending').toUpperCase()),
+            if ((req['status'] ?? '').toString().toLowerCase() == 'pending') ...[
+              const SizedBox(height: AppSpacing.xxl),
               SizedBox(
                 width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: () => _cancelRequest(req['request_id'].toString()),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red[50],
-                    foregroundColor: Colors.red,
-                    elevation: 0,
-                    side: const BorderSide(color: Colors.red),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _cancelRequest(req['request_id'].toString());
+                  },
+                  icon: const Icon(Icons.cancel_outlined, size: 20),
+                  label: const Text('CANCEL REQUEST'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                    side: const BorderSide(color: AppColors.error),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md)),
                   ),
-                  child: const Text("CANCEL REQUEST", 
-                      style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
-            const SizedBox(height: 10),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value, {Color? color, bool isBold = false}) {
+  Widget _detailRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 120, child: Text(label, style: const TextStyle(color: Colors.grey))),
+          SizedBox(
+              width: 120,
+              child: Text(label,
+                  style: AppTypography.bodyMedium
+                      .copyWith(color: AppColors.neutral60))),
           Expanded(
-            child: Text(value, 
-                style: TextStyle(
-                  fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-                  color: color ?? Colors.black87,
-                )),
-          ),
+              child: Text(value,
+                  style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.neutral90,
+                      fontWeight: FontWeight.w600))),
         ],
       ),
     );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'confirmed': return Colors.green;
-      case 'cancelled': return Colors.red;
-      case 'completed': return Colors.blue;
-      default: return Colors.orange;
-    }
-  }
-
-  void _showTopNotification(BuildContext context, String message, Color color) {
-    final overlay = Overlay.of(context);
-    final overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: MediaQuery.of(context).padding.top + 10,
-        left: 20,
-        right: 20,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(15),
-              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-    overlay.insert(overlayEntry);
-    Future.delayed(const Duration(seconds: 3), () => overlayEntry.remove());
+  List<dynamic> _filtered() {
+    if (_selectedFilter == 'All') return _requests;
+    return _requests.where((r) {
+      final s = (r['status'] ?? '').toString().toLowerCase();
+      return s == _selectedFilter.toLowerCase();
+    }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    final filtered = _filtered();
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: AppColors.scaffoldBg,
       appBar: AppBar(
-        title: const Text("My Consult Requests", style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: const Color.fromARGB(255, 36, 154, 25),
-        foregroundColor: Colors.white,
-        elevation: 0,
+        title: const Text('My Consult Requests'),
         actions: [
-          IconButton(onPressed: _fetchRequests, icon: const Icon(Icons.refresh_rounded)),
+          IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              tooltip: 'Refresh',
+              onPressed: _fetchRequests),
         ],
       ),
-      body: RefreshIndicator(
-        color: const Color.fromARGB(255, 36, 154, 25),
-        onRefresh: _fetchRequests,
-        child: isLoading && requests.isEmpty
-            ? const Center(child: CircularProgressIndicator())
-            : requests.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    padding: const EdgeInsets.all(15),
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemCount: requests.length,
-                    itemBuilder: (context, index) {
-                      final req = requests[index];
-                      String status = req['status'] ?? 'Pending';
-
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                        elevation: 1,
-                        child: ListTile(
-                          onTap: () => _showRequestDetails(req), // TAP TO SHOW DETAILS
-                          contentPadding: const EdgeInsets.all(15),
-                          leading: CircleAvatar(
-                            backgroundColor: _getStatusColor(status).withOpacity(0.1),
-                            child: Icon(Icons.medical_services_outlined, color: _getStatusColor(status)),
-                          ),
-                          title: Text(req['consultation_reason'],
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                            maxLines: 1, overflow: TextOverflow.ellipsis),
-                          subtitle: Padding(
-                            padding: const EdgeInsets.only(top: 5),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text("Preferred: ${req['preferred_date']}"),
-                                Text("ID: #${req['request_id']}", style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                              ],
-                            ),
-                          ),
-                          trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-                        ),
-                      );
-                    },
+      body: Column(
+        children: [
+          SizedBox(
+            height: 48,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+              itemCount: _filters.length,
+              itemBuilder: (context, i) {
+                final sel = _selectedFilter == _filters[i];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: FilterChip(
+                    label: Text(_filters[i]),
+                    selected: sel,
+                    onSelected: (_) =>
+                        setState(() => _selectedFilter = _filters[i]),
+                    backgroundColor: AppColors.surface,
+                    selectedColor: AppColors.primarySurface,
+                    checkmarkColor: AppColors.primary,
+                    labelStyle: AppTypography.labelMedium.copyWith(
+                        color:
+                            sel ? AppColors.primary : AppColors.neutral70),
+                    side: BorderSide.none,
+                    shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppRadius.full)),
                   ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.3),
-        const Center(
-          child: Column(
-            children: [
-              Icon(Icons.assignment_late_outlined, size: 70, color: Colors.grey),
-              SizedBox(height: 15),
-              Text("No requests yet.", style: TextStyle(color: Colors.grey, fontSize: 16)),
-            ],
+                );
+              },
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: AppSpacing.sm),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : RefreshIndicator(
+                    onRefresh: _fetchRequests,
+                    child: filtered.isEmpty
+                        ? ListView(children: [
+                            SizedBox(
+                                height:
+                                    MediaQuery.of(context).size.height * 0.4,
+                                child: AppEmptyState(
+                                  icon: Icons.assignment_late_outlined,
+                                  title: _requests.isEmpty
+                                      ? 'No Requests Yet'
+                                      : 'No $_selectedFilter Requests',
+                                  subtitle: _requests.isEmpty
+                                      ? 'Your teleconsult requests will appear here.'
+                                      : 'No requests match the selected filter.',
+                                )),
+                          ])
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(AppSpacing.lg,
+                                AppSpacing.sm, AppSpacing.lg, AppSpacing.xxxl),
+                            itemCount: filtered.length,
+                            itemBuilder: (context, i) {
+                              final req = filtered[i];
+                              return Padding(
+                                padding: const EdgeInsets.only(
+                                    bottom: AppSpacing.md),
+                                child: Material(
+                                  color: AppColors.surface,
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.lg),
+                                  child: InkWell(
+                                    onTap: () => _showDetails(req),
+                                    borderRadius: BorderRadius.circular(
+                                        AppRadius.lg),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(
+                                          AppSpacing.lg),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(
+                                            AppRadius.lg),
+                                        boxShadow: AppElevation.subtle,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(
+                                                AppSpacing.md),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primarySurface,
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                      AppRadius.md),
+                                            ),
+                                            child: const Icon(
+                                                Icons
+                                                    .medical_services_outlined,
+                                                color: AppColors.primary,
+                                                size: 22),
+                                          ),
+                                          const SizedBox(
+                                              width: AppSpacing.md),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                    req['consultation_reason'] ??
+                                                        'No reason',
+                                                    style: AppTypography
+                                                        .titleMedium
+                                                        .copyWith(
+                                                            color: AppColors
+                                                                .neutral100),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow
+                                                        .ellipsis),
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  children: [
+                                                    Text(
+                                                        'Preferred: ${req['preferred_date'] ?? 'N/A'}',
+                                                        style: AppTypography
+                                                            .caption
+                                                            .copyWith(
+                                                                color: AppColors
+                                                                    .neutral60)),
+                                                    const SizedBox(
+                                                        width:
+                                                            AppSpacing.md),
+                                                    Text(
+                                                        '#${req['request_id'] ?? 'N/A'}',
+                                                        style: AppTypography
+                                                            .caption
+                                                            .copyWith(
+                                                                color: AppColors
+                                                                    .neutral50)),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          AppStatusBadge.fromStatus(
+                                              context, req['status'] ?? 'Pending'),
+                                          const SizedBox(
+                                              width: AppSpacing.sm),
+                                          const Icon(Icons.chevron_right,
+                                              color: AppColors.neutral50,
+                                              size: 20),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,50 +1,23 @@
 class AppConfig {
-  // Ang iyong Local IP Address
-  static const String serverIP = "akopmember.anakalusugan.com.ph"; 
-  // static const String serverIP = "192.168.100.129"; 
-  
-  // Base URL (Base sa iyong folder name na 'akop_member')
-  // static const String baseUrl = "http://$serverIP/akop_member";
-  static const String baseUrl = "http://$serverIP/api";
+  AppConfig._();
 
-  // akopmember.anakalusugan.com.ph
-  
-  // Endpoints para sa Login
-  static const String checkUserUrl = "$baseUrl/check_user.php";
-  static const String verifyOtpUrl = "$baseUrl/verify_otp.php";
-  
-  // Endpoints para sa Dashboard (I-prepare na natin)
+  // ── Environment ──
+  // Production: 'akopmember.anakalusugan.com.ph'
+  // Local LAN:  '192.168.1.107'
+  static const String _host = 'akopmember.anakalusugan.com.ph';
 
+  // ── PHP Backend Path ──
+  static const String _backendPath = 'api';
 
+  // ── Base URL ──
+  static const String baseUrl = 'http://$_host/$_backendPath';
 
+  // ── Endpoints ──
+  static const String checkUserUrl = '$baseUrl/check_user.php';
+  static const String verifyOtpUrl = '$baseUrl/verify_otp.php';
+  static const String getHistoryUrl = '$baseUrl/get_history.php';
+  static const String getNewsUrl = '$baseUrl/get_news.php';
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  
-  static const String getHistoryUrl = "$baseUrl/get_history.php";
-  static const String getNewsUrl = "$baseUrl/get_news.php";
+  // ── Timeout ──
+  static const Duration apiTimeout = Duration(seconds: 10);
 }

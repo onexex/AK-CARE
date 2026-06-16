@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:developer' as dev;
 import '../core/config.dart';
+import '../design_system/app_colors.dart';
+import '../design_system/app_radius.dart';
+import '../design_system/app_spacing.dart';
+import '../design_system/app_typography.dart';
+import '../design_system/app_elevation.dart';
+import '../widgets/app_empty_state.dart';
+import '../widgets/app_status_badge.dart';
 
 class HistoryScreen extends StatefulWidget {
   final String userId;
@@ -14,148 +20,136 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   late Future<List<dynamic>> _historyFuture;
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+  List<dynamic> _allItems = [];
 
   @override
   void initState() {
     super.initState();
-    _historyFuture = fetchHistory();
+    _historyFuture = _fetchHistory();
   }
 
-  Future<List<dynamic>> fetchHistory() async {
-    dev.log("Fetching history for user_id: ${widget.userId}", name: "HISTORY_FETCH");
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<List<dynamic>> _fetchHistory() async {
     try {
       final response = await http.get(
-        Uri.parse("${AppConfig.baseUrl}/get_history.php?user_id=${widget.userId}"),
-      );
-
+        Uri.parse(
+            '${AppConfig.baseUrl}/get_history.php?user_id=${widget.userId}'),
+      ).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['status'] == 'success') {
-          return data['data'];
+          _allItems = data['data'];
+          return _allItems;
         }
       }
-    } catch (e) {
-      dev.log("History Fetch Error: $e");
-    }
+    } catch (_) {}
     return [];
   }
 
-  Future<void> _handleRefresh() async {
-    setState(() {
-      _historyFuture = fetchHistory();
-    });
+  Future<void> _onRefresh() async {
+    setState(() => _historyFuture = _fetchHistory());
     await _historyFuture;
   }
 
-  // --- FUNCTION PARA SA MODAL DETAILS ---
-  void _showDetails(BuildContext context, Map<String, dynamic> item) {
+  List<dynamic> _filtered(List<dynamic> items) {
+    if (_searchQuery.isEmpty) return items;
+    final q = _searchQuery.toLowerCase();
+    return items.where((i) {
+      return (i['p_patient'] ?? '').toString().toLowerCase().contains(q) ||
+          (i['p_complaint'] ?? '').toString().toLowerCase().contains(q);
+    }).toList();
+  }
+
+  void _showDetails(Map<String, dynamic> item) {
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true, // Mahalaga ito dahil marami tayong fields
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.85, // 85% ng screen height
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 50, height: 5,
-                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                "Consultation Detail",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: const Color.fromARGB(255, 36, 154, 25),
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.92,
+        minChildSize: 0.4,
+        expand: false,
+        builder: (context, scrollController) => ListView(
+          controller: scrollController,
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xxl, 0, AppSpacing.xxl, AppSpacing.xxxl),
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySurface,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: const Icon(Icons.medical_services_rounded,
+                      color: AppColors.primary),
                 ),
-              ),
-              const SizedBox(height: 5),
-              Text("Control ID: ${item['p_ctrlID'] ?? 'N/A'}", style: const TextStyle(color: Colors.grey)),
-              const Divider(height: 30),
-              
-              // Scrollable Content area
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 25),
-                  children: [
-                    _buildDetailRow("Patient Name", item['p_patient']),
-                    _buildDetailRow("Chief Complaint", item['p_complaint']),
-                    _buildDetailRow("Medical History", item['p_history']),
-                    _buildDetailRow("Current Medication", item['p_medication']),
-                    _buildDetailRow("Prescribed Medicine", item['p_med']),
-                    _buildDetailRow("Other Notes", item['p_others']),
-                    _buildDetailRow("Transfer Comment", item['p_trasfer_comment']),
-                    
-                    const SizedBox(height: 15),
-                    const Text("Status:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
-                    const SizedBox(height: 5),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: (item['status'] == 'Completed') ? Colors.green[100] : Colors.orange[100],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          item['status'] ?? 'Pending',
-                          style: TextStyle(
-                            color: (item['status'] == 'Completed') ? Colors.green[900] : Colors.orange[900],
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-                  ],
-                ),
-              ),
-              
-              // Bottom Action Button
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromARGB(255, 36, 154, 25),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: const Text("Done", style: TextStyle(color: Colors.white, fontSize: 16)),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Consultation Detail',
+                          style: AppTypography.titleLarge
+                              .copyWith(color: AppColors.neutral100)),
+                      Text('ID: ${item['p_ctrlID'] ?? 'N/A'}',
+                          style: AppTypography.caption
+                              .copyWith(color: AppColors.neutral60)),
+                    ],
                   ),
                 ),
-              ),
-            ],
-          ),
-        );
-      },
+                AppStatusBadge.fromStatus(context, item['status'] ?? 'Pending'),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xxl),
+            if (_hasValue(item['p_patient']))
+              _detailRow('Patient Name', item['p_patient']),
+            if (_hasValue(item['p_complaint']))
+              _detailRow('Chief Complaint', item['p_complaint']),
+            if (_hasValue(item['p_history']))
+              _detailRow('Medical History', item['p_history']),
+            if (_hasValue(item['p_medication']))
+              _detailRow('Current Medication', item['p_medication']),
+            if (_hasValue(item['p_med']))
+              _detailRow('Prescribed Medicine', item['p_med']),
+            if (_hasValue(item['p_others']))
+              _detailRow('Other Notes', item['p_others']),
+            if (_hasValue(item['p_trasfer_comment']))
+              _detailRow('Transfer Comment', item['p_trasfer_comment']),
+          ],
+        ),
+      ),
     );
   }
 
-  // Helper Widget para sa bawat row ng impormasyon
-  Widget _buildDetailRow(String label, String? value) {
+  bool _hasValue(dynamic v) =>
+      v != null && v.toString().isNotEmpty && v.toString() != 'None';
+
+  Widget _detailRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
-          const SizedBox(height: 4),
-          Text(
-            (value == null || value.isEmpty) ? "None" : value,
-            style: const TextStyle(fontSize: 16, color: Colors.black87, fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 8),
-          Divider(color: Colors.grey[200], thickness: 1),
+          Text(label,
+              style: AppTypography.labelMedium
+                  .copyWith(color: AppColors.neutral60)),
+          const SizedBox(height: AppSpacing.xs),
+          Text(value,
+              style: AppTypography.bodyLarge
+                  .copyWith(color: AppColors.neutral90)),
+          const SizedBox(height: AppSpacing.sm),
+          const Divider(color: AppColors.neutral30),
         ],
       ),
     );
@@ -164,61 +158,144 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Consultation History"),
-        backgroundColor: const Color.fromARGB(255, 36, 154, 25),
-        foregroundColor: Colors.white,
-      ),
-      body: FutureBuilder<List<dynamic>>(
-        future: _historyFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return Center(child: Text("Error: ${snapshot.error}"));
-          }
-
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return RefreshIndicator(
-              onRefresh: _handleRefresh,
-              child: ListView(
-                children: const [
-                  SizedBox(height: 100),
-                  Center(child: Text("No history found.")),
-                ],
+      backgroundColor: AppColors.scaffoldBg,
+      appBar: AppBar(title: const Text('Consultation History')),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.sm),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+              decoration: InputDecoration(
+                hintText: 'Search by patient or complaint...',
+                prefixIcon: const Icon(Icons.search_rounded, size: 22),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded, size: 20),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: AppColors.surface,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    borderSide: BorderSide.none),
               ),
-            );
-          }
-
-          return RefreshIndicator(
-            onRefresh: _handleRefresh,
-            child: ListView.builder(
-              padding: const EdgeInsets.all(15),
-              itemCount: snapshot.data!.length,
-              itemBuilder: (context, index) {
-                final item = snapshot.data![index];
-                return Card(
-                  elevation: 2,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                  child: ListTile(
-                    leading: const CircleAvatar(
-                      backgroundColor: Color.fromARGB(255, 36, 154, 25),
-                      child: Icon(Icons.medical_services, color: Colors.white),
-                    ),
-                    title: Text(item['p_patient'] ?? 'No Name', // Pinalitan ng Patient name ang title
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text(item['created_at'] ?? ''),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _showDetails(context, item),
+            ),
+          ),
+          Expanded(
+            child: FutureBuilder<List<dynamic>>(
+              future: _historyFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final filtered =
+                    _filtered(snapshot.hasData ? snapshot.data! : []);
+                if (filtered.isEmpty) {
+                  return RefreshIndicator(
+                    onRefresh: _onRefresh,
+                    child: ListView(children: [
+                      SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.4,
+                          child: AppEmptyState(
+                            icon: _searchQuery.isNotEmpty
+                                ? Icons.search_off_rounded
+                                : Icons.history_rounded,
+                            title: _searchQuery.isNotEmpty
+                                ? 'No Results'
+                                : 'No History Yet',
+                            subtitle: _searchQuery.isNotEmpty
+                                ? 'Try a different search term.'
+                                : 'Your consultations will appear here.',
+                          )),
+                    ]),
+                  );
+                }
+                return RefreshIndicator(
+                  onRefresh: _onRefresh,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.xxxl),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      final item = filtered[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                        child: Material(
+                          color: AppColors.surface,
+                          borderRadius:
+                              BorderRadius.circular(AppRadius.lg),
+                          child: InkWell(
+                            onTap: () => _showDetails(item),
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.lg),
+                            child: Container(
+                              padding: const EdgeInsets.all(AppSpacing.lg),
+                              decoration: BoxDecoration(
+                                borderRadius:
+                                    BorderRadius.circular(AppRadius.lg),
+                                boxShadow: AppElevation.subtle,
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(AppSpacing.md),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primarySurface,
+                                      borderRadius:
+                                          BorderRadius.circular(AppRadius.md),
+                                    ),
+                                    child: const Icon(
+                                        Icons.medical_services_rounded,
+                                        color: AppColors.primary,
+                                        size: 22),
+                                  ),
+                                  const SizedBox(width: AppSpacing.md),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(item['p_patient'] ?? 'No Name',
+                                            style: AppTypography.titleMedium
+                                                .copyWith(
+                                                    color:
+                                                        AppColors.neutral100),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis),
+                                        const SizedBox(height: 4),
+                                        Text(item['created_at'] ?? '',
+                                            style: AppTypography.caption
+                                                .copyWith(
+                                                    color:
+                                                        AppColors.neutral60)),
+                                      ],
+                                    ),
+                                  ),
+                                  AppStatusBadge.fromStatus(
+                                      context, item['status'] ?? 'Pending'),
+                                  const SizedBox(width: AppSpacing.sm),
+                                  const Icon(Icons.chevron_right,
+                                      color: AppColors.neutral50, size: 20),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 );
               },
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }

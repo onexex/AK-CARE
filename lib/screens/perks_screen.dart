@@ -1,207 +1,165 @@
-import 'package:akop_member_app/screens/request_status_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../core/config.dart';
+import '../design_system/app_colors.dart';
+import '../design_system/theme_colors.dart';
+import '../design_system/app_radius.dart';
+import '../design_system/app_spacing.dart';
+import '../design_system/app_typography.dart';
+import '../design_system/app_elevation.dart';
+import '../widgets/app_button.dart';
+import '../widgets/app_section_header.dart';
+import 'request_status_screen.dart';
+import 'eprescription_screen.dart';
+import 'pharmacy_discounts_screen.dart';
+import 'medical_certs_screen.dart';
+import 'package:http/http.dart' as http;
 
-class PerksScreen extends StatelessWidget {
+class PerksScreen extends StatefulWidget {
   const PerksScreen({super.key});
 
-  Future<void> _makePhoneCall(String phoneNumber) async {
-    final Uri launchUri = Uri(
-      scheme: 'tel',
-      path: phoneNumber,
-    );
+  @override
+  State<PerksScreen> createState() => _PerksScreenState();
+}
+
+class _PerksScreenState extends State<PerksScreen> {
+  Future<void> _makePhoneCall(String number) async {
+    final uri = Uri(scheme: 'tel', path: number);
     try {
-      if (await canLaunchUrl(launchUri)) {
-        await launchUrl(launchUri);
-      } else {
-        debugPrint('Could not launch $launchUri');
-      }
+      if (await canLaunchUrl(uri)) await launchUrl(uri);
     } catch (e) {
-      debugPrint('Error launching dialer: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open dialer: $e'),
+              backgroundColor: Colors.red, behavior: SnackBarBehavior.floating),
+        );
+      }
     }
   }
 
-  void _showScheduleForm(BuildContext context) {
-    // 1. Kuhanin ang messenger gamit ang MAIN context ng PerksScreen
-    final rootMessenger = ScaffoldMessenger.of(context);
-    
-    final TextEditingController reasonController = TextEditingController();
-    final TextEditingController dateController = TextEditingController();
-    bool isLoading = false;
+  void _showScheduleForm() {
+    final reasonCtrl = TextEditingController();
+    final dateCtrl = TextEditingController();
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (modalContext) => StatefulBuilder( // Ginamit ang modalContext para sa Navigator.pop
-        builder: (BuildContext context, StateSetter setModalState) {
-          return Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-            ),
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          bool loading = false;
+
+          return Padding(
             padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              left: 25,
-              right: 25,
-              top: 20,
-            ),
+                bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.xxl,
+                left: AppSpacing.xxl,
+                right: AppSpacing.xxl,
+                top: 0),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Center(
-                    child: Container(
-                      width: 50,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    "Request Teleconsult",
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                  ),
-                  const Text(
-                    "Tell us your concern and preferred schedule.",
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 25),
-
-                  const Text("Reason for Consultation",
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
+                  Text('Request Teleconsult',
+                      style: AppTypography.headlineMedium.copyWith(
+                          color: AppColors.neutral100)),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text('Tell us your concern and preferred schedule.',
+                      style: AppTypography.bodyMedium.copyWith(
+                          color: AppColors.neutral60)),
+                  const SizedBox(height: AppSpacing.xxl),
+                  Text('Reason for Consultation',
+                      style: AppTypography.labelMedium.copyWith(
+                          color: AppColors.neutral80)),
+                  const SizedBox(height: AppSpacing.sm),
                   TextField(
-                    controller: reasonController,
+                    controller: reasonCtrl,
                     maxLines: 3,
-                    enabled: !isLoading,
-                    decoration: InputDecoration(
-                      hintText: "e.g. Fever, Headache, Requesting MedCert...",
-                      filled: true,
-                      fillColor: Colors.grey[100],
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
+                    enabled: !loading,
+                    decoration: const InputDecoration(
+                        hintText: 'e.g. Fever, Headache'),
                   ),
-                  const SizedBox(height: 20),
-
-                  const Text("Preferred Date",
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text('Preferred Date',
+                      style: AppTypography.labelMedium.copyWith(
+                          color: AppColors.neutral80)),
+                  const SizedBox(height: AppSpacing.sm),
                   TextField(
-                    controller: dateController,
+                    controller: dateCtrl,
                     readOnly: true,
-                    enabled: !isLoading,
+                    enabled: !loading,
+                    decoration: const InputDecoration(
+                        hintText: 'Select Date',
+                        suffixIcon: Icon(Icons.calendar_month, size: 22)),
                     onTap: () async {
-                      DateTime? pickedDate = await showDatePicker(
+                      final picked = await showDatePicker(
                         context: context,
                         initialDate: DateTime.now().add(const Duration(days: 1)),
                         firstDate: DateTime.now(),
                         lastDate: DateTime.now().add(const Duration(days: 30)),
                       );
-                      if (pickedDate != null) {
-                        dateController.text =
-                            "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')}";
+                      if (picked != null) {
+                        dateCtrl.text =
+                            '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
                       }
                     },
-                    decoration: InputDecoration(
-                      hintText: "Select Date",
-                      prefixIcon: const Icon(Icons.calendar_month, size: 20),
-                      filled: true,
-                      fillColor: Colors.grey[100],
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
                   ),
-                  const SizedBox(height: 30),
-
-                  // SUBMIT BUTTON SECTION
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: ElevatedButton(
-                      onPressed: isLoading ? null : () async {  
-                        if (reasonController.text.isEmpty || dateController.text.isEmpty) {
-                        
-                         _showTopNotification(context, "Please fill in all fields.", Colors.orange);
-                        return; 
-                        }
-                        setModalState(() => isLoading = true);
-
-                        try {
-                          final SharedPreferences prefs = await SharedPreferences.getInstance();
-                          String? userJson = prefs.getString('user_session');
-
-                          if (userJson != null) {
-                            Map<String, dynamic> userData = json.decode(userJson);
-                            String userId = userData['id'].toString();
-                            String phone = userData['contact'] ?? ''; 
-
-                            final response = await http.post(
-                              Uri.parse("${AppConfig.baseUrl}/save_teleconsult.php"),
-                              body: {
-                                "user_id": userId,
-                                "consultation_reason": reasonController.text,
-                                "preferred_date": dateController.text,
-                                "phone_number": phone,
-                              },
-                            ).timeout(const Duration(seconds: 10));  
-                            debugPrint("SERVER RESPONSE: ${response.body}");
-                            final result = json.decode(response.body);
-                            if (result['status'] == 'success') {
-                               
-                              Navigator.pop(modalContext); 
-                              _showTopNotification(
-                                  context, 
-                                  "Request submitted! We will contact you soon.", 
-                                   Color.fromARGB(255, 36, 154, 25)
-                                );
-
-                              
-                            } else {
-                              throw Exception(result['message']);
-                            }
+                  const SizedBox(height: AppSpacing.xxl),
+                  AppButton(
+                    label: 'SUBMIT REQUEST',
+                    icon: Icons.send_rounded,
+                    isLoading: loading,
+                    onPressed: loading ? null : () async {
+                      if (reasonCtrl.text.isEmpty || dateCtrl.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Please fill in all fields.'),
+                              backgroundColor: Colors.amber,
+                              behavior: SnackBarBehavior.floating),
+                        );
+                        return;
+                      }
+                      setModalState(() => loading = true);
+                      try {
+                        final prefs = await SharedPreferences.getInstance();
+                        final json = prefs.getString('user_session');
+                        if (json != null) {
+                          final user = jsonDecode(json);
+                          final response = await http.post(
+                            Uri.parse('${AppConfig.baseUrl}/save_teleconsult.php'),
+                            body: {
+                              'user_id': user['id'].toString(),
+                              'consultation_reason': reasonCtrl.text,
+                              'preferred_date': dateCtrl.text,
+                              'phone_number': user['contact'] ?? '',
+                            },
+                          ).timeout(const Duration(seconds: 10));
+                          final result = jsonDecode(response.body);
+                          if (result['status'] == 'success') {
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('Request submitted! We will contact you soon.'),
+                                  backgroundColor: Colors.green,
+                                  behavior: SnackBarBehavior.floating),
+                            );
                           } else {
-                            throw Exception("User session not found.");
+                            throw Exception(result['message']);
                           }
-                        } catch (e) {
-                          setModalState(() => isLoading = false);
-                          setModalState(() => isLoading = false);
-                          _showTopNotification(context, "Error: $e", Colors.red);
                         }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromARGB(255, 36, 154, 25),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                      ),
-                      child: isLoading 
-                        ? const SizedBox(
-                            height: 20, 
-                            width: 20, 
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                          )
-                        : const Text(
-                            "SUBMIT REQUEST",
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16),
-                          ),
-                    ),
+                      } catch (e) {
+                        setModalState(() => loading = false);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content: Text('Error: $e'),
+                              backgroundColor: Colors.red,
+                              behavior: SnackBarBehavior.floating),
+                        );
+                      }
+                    },
                   ),
                 ],
               ),
@@ -214,243 +172,211 @@ class PerksScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text("Member Perks"),
-        backgroundColor: const Color.fromARGB(255, 36, 154, 25),
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          _buildFeaturedPerk(context),
-          const SizedBox(height: 25),
-          const Text("Other Benefits",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 15),
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            crossAxisSpacing: 15,
-            mainAxisSpacing: 15,
-            childAspectRatio: 1.1,
-            children: [
-              _buildPerkCard("E-Prescription", Icons.medication_liquid_rounded,
-                  Colors.blue, "View history", () {}),
-              _buildPerkCard("Pharmacy Disc.", Icons.local_pharmacy, Colors.red,
-                  "Up to 10% off", () {}),
-              _buildPerkCard(
-                "Consult Requests", 
-                Icons.pending_actions_rounded, 
-                Colors.deepPurple, 
-                "Track status", 
-                () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const RequestStatusScreen()),
-                  );
-                },
-              ),
-              _buildPerkCard("Med Certificate", Icons.verified_user_rounded,
-                  Colors.orange, "Fast request", () {}),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                debugPrint("Dialing hotline...");
-                _makePhoneCall('09352427713');
+      backgroundColor: tc.scaffoldBg,
+      appBar: AppBar(title: const Text('Member Perks')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildFeaturedPerk(),
+            const SizedBox(height: AppSpacing.xxl),
+            AppSectionHeader(title: 'Other Benefits'),
+            const SizedBox(height: AppSpacing.sm),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final cols = constraints.maxWidth > 500 ? 4 : 2;
+                return GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: cols,
+                  crossAxisSpacing: AppSpacing.md,
+                  mainAxisSpacing: AppSpacing.md,
+                  childAspectRatio: 1.1,
+                  children: [
+                    _perkCard(
+                        'E-Prescription',
+                        Icons.medication_liquid_rounded,
+                        const Color(0xFF2196F3),
+                        'View history',
+                        () => Navigator.push(context, MaterialPageRoute(
+                            builder: (_) => const EPrescriptionScreen())),
+                        tc),
+                    _perkCard(
+                        'Pharmacy Disc.',
+                        Icons.local_pharmacy_rounded,
+                        const Color(0xFFE91E63),
+                        'Up to 10% off',
+                        () => Navigator.push(context, MaterialPageRoute(
+                            builder: (_) => const PharmacyDiscountsScreen())),
+                        tc),
+                    _perkCard(
+                        'Consult Requests',
+                        Icons.pending_actions_rounded,
+                        const Color(0xFF673AB7),
+                        'Track status',
+                        () => Navigator.push(context, MaterialPageRoute(
+                            builder: (_) => const RequestStatusScreen())),
+                        tc),
+                    _perkCard(
+                        'Med Certificate',
+                        Icons.verified_user_rounded,
+                        const Color(0xFFFF9800),
+                        'Fast request',
+                        () => Navigator.push(context, MaterialPageRoute(
+                            builder: (_) => const MedicalCertsScreen())),
+                        tc),
+                  ],
+                );
               },
-              borderRadius: BorderRadius.circular(20),
-              child: _buildWidePerkCard("AnaKalusugan Hotline",
-                  Icons.support_agent_rounded, Colors.teal, "Tap to call: 0935 242 7713"),
             ),
-          ),
-          const SizedBox(height: 30),
-        ],
+            const SizedBox(height: AppSpacing.xxl),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => _makePhoneCall('09352427713'),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                child: Container(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: tc.deepTealLight,
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    border: Border.all(
+                        color: AppColors.deepTeal.withOpacity(0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                            color: AppColors.deepTeal.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(AppRadius.md)),
+                        child: const Icon(Icons.support_agent_rounded,
+                            color: AppColors.deepTeal, size: 28),
+                      ),
+                      const SizedBox(width: AppSpacing.lg),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('AnaKalusugan Hotline',
+                                style: AppTypography.titleMedium
+                                    .copyWith(color: AppColors.deepTeal)),
+                            const SizedBox(height: 2),
+                            Text('Tap to call: 0935 242 7713',
+                                style: AppTypography.bodySmall.copyWith(
+                                    color: AppColors.deepTeal.withOpacity(0.7))),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.call_rounded,
+                          color: AppColors.deepTeal, size: 24),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.huge),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildFeaturedPerk(BuildContext context) {
+  Widget _buildFeaturedPerk() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AppSpacing.xxl),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color.fromARGB(255, 36, 154, 25),
-            Color.fromARGB(255, 80, 180, 70)
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(25),
+            colors: [AppColors.primary, AppColors.primaryLight],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
+        boxShadow: AppElevation.medium,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.medical_services_rounded,
-              color: Colors.white, size: 40),
-          const SizedBox(height: 15),
-          const Text("AnaKalusugan Teleconsult",
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold)),
-          const Text("Talk to a doctor, for FREE.",
-              style: TextStyle(color: Colors.white70, fontSize: 14)),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: () => _showScheduleForm(context),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: Colors.green[800],
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10))),
-            child: const Text("Start Consult Now"),
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPerkCard(
-    String title, IconData icon, Color color, String sub, VoidCallback onTap) {
-  return Material( 
-    color: Colors.transparent,
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(25),
-      child: Container(
-        padding: const EdgeInsets.all(18), 
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(25),
-          border: Border.all(color: Colors.grey[100]!), 
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 28),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold, 
-                fontSize: 14,
-                color: Colors.black87,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              sub,
-              style: TextStyle(
-                fontSize: 11, 
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-  Widget _buildWidePerkCard(
-      String title, IconData icon, Color color, String sub) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 40),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 4),
-                Text(sub,
-                    style:
-                        const TextStyle(fontSize: 13, color: Colors.black54)),
-              ],
-            ),
-          ),
-          const Icon(Icons.call, color: Colors.teal),
-        ],
-      ),
-    );
-  }
-
-  void _showTopNotification(BuildContext context, String message, Color color) {
-    final overlay = Overlay.of(context);
-    final overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: MediaQuery.of(context).padding.top + 10, // Sa itaas ng screen (below status bar)
-        left: 20,
-        right: 20,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(15),
-              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(AppRadius.md)),
+            child: const Icon(Icons.medical_services_rounded,
+                color: Colors.white, size: 28),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text('AnaKalusugan Teleconsult',
+              style: AppTypography.headlineMedium.copyWith(color: Colors.white)),
+          const SizedBox(height: AppSpacing.xs),
+          Text('Talk to a doctor, for FREE.',
+              style: AppTypography.bodyMedium.copyWith(
+                  color: Colors.white.withOpacity(0.8))),
+          const SizedBox(height: AppSpacing.xxl),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _showScheduleForm,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: AppColors.primary,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xxl, vertical: AppSpacing.lg),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md)),
+                textStyle: AppTypography.labelLarge,
+              ),
+              child: const Text('Start Consult Now'),
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    message,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _perkCard(String title, IconData icon, Color color, String sub,
+      VoidCallback onTap, ThemeColors tc) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          decoration: BoxDecoration(
+            color: tc.surface,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            boxShadow: AppElevation.subtle,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(AppRadius.md)),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(title,
+                  style: AppTypography.labelLarge
+                      .copyWith(color: tc.neutral90),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+              const SizedBox(height: AppSpacing.xs),
+              Text(sub,
+                  style: AppTypography.caption
+                      .copyWith(color: tc.neutral60)),
+            ],
           ),
         ),
       ),
     );
-
-    overlay.insert(overlayEntry);
-
-    Future.delayed(const Duration(seconds: 3), () {
-      overlayEntry.remove();
-    });
   }
 }

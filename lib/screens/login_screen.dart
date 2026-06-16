@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';  
-import 'dart:convert'; 
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../core/config.dart';
-import 'dart:developer' as dev;  
-import 'home_dashboard.dart';  
+import '../design_system/theme_colors.dart';
+import '../design_system/app_radius.dart';
+import '../design_system/app_spacing.dart';
+import '../design_system/app_typography.dart';
+import '../design_system/app_elevation.dart';
+import '../design_system/app_theme.dart';
+import '../widgets/app_button.dart';
+import 'home_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,370 +20,346 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _otpController = TextEditingController();
-  
+  final _phoneController = TextEditingController();
+  final _otpControllers = List.generate(4, (_) => TextEditingController());
+  final _otpFocusNodes = List.generate(4, (_) => FocusNode());
   bool _isOtpSent = false;
   bool _isLoading = false;
+  String? _error;
 
-  // Branding Colors
-  final Color primaryGreen = const Color(0xFF12A006); 
-  final Color deepTeal = const Color(0xFF004D40);
-  final Color bgLight = const Color(0xFFF0F7F0);
-
-  // --- STEP 1: Request OTP ---
-  Future<void> _requestOtp() async {
-    if (_phoneController.text.isEmpty) {
-      _showError("Please enter your phone number");
-      return;
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    for (final c in _otpControllers) {
+      c.dispose();
     }
-
-    setState(() => _isLoading = true);
-    
-    try {
-      final response = await http.post(
-        Uri.parse(AppConfig.checkUserUrl),
-        body: {'phone_number': _phoneController.text},
-      ).timeout(const Duration(seconds: 4));
-
-      if (!mounted) return;
-
-      final data = json.decode(response.body);
-      dev.log("Server Response: $data", name: "AUTH");
-
-      if (data['status'] == 'success') {
-        setState(() => _isOtpSent = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("OTP Sent: ${data['otp']}"), 
-            backgroundColor: primaryGreen,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      } else {
-        _showError(data['message']);
-      }
-    } catch (e) {
-      if (!mounted) return;
-      
-      _showError("Connection failed. Please try again.");
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    for (final f in _otpFocusNodes) {
+      f.dispose();
     }
+    super.dispose();
   }
 
-  // --- STEP 2: Verify OTP & Save Session ---
-  Future<void> _verifyOtp() async {
-    if (_otpController.text.length < 6) {
-      _showError("Please enter the 6-digit code");
-      return;
-    }
-
-    setState(() => _isLoading = true);
-    
-    try {
-      final response = await http.post(
-        Uri.parse(AppConfig.verifyOtpUrl),
-        body: {
-          'phone_number': _phoneController.text,
-          'otp_code': _otpController.text,
-        },
-      );
-
-      if (!mounted) return;
-
-      final data = json.decode(response.body);
-
-      if (data['status'] == 'success') {
-        final SharedPreferences prefs = await SharedPreferences.getInstance();
-        
-        // I-save ang user object para sa auto-login
-        if (data['user'] != null) {
-          await prefs.setString('user_session', json.encode(data['user']));
-        }
-
-        if (!mounted) return;
-
-        // Lipat sa Dashboard
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => HomeDashboard(userData: data['user']),
-          ),
-        );
-      } else {
-        _showError(data['message']);
-      }
-    } catch (e) {
-      if (!mounted) return;
-      _showError("Verification failed.");
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
+  String get _combinedOtp => _otpControllers.map((c) => c.text).join();
 
   void _showError(String msg) {
     if (!mounted) return;
+    final tc = ThemeColors.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg), 
-        backgroundColor: Colors.redAccent,
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text(msg)),
+          ],
+        ),
+        backgroundColor: tc.error,
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
+  void _showSuccess(String msg) {
+    if (!mounted) return;
+    final tc = ThemeColors.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text(msg)),
+          ],
+        ),
+        backgroundColor: tc.success,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _requestOtp() async {
+    setState(() => _error = null);
+    if (_phoneController.text.trim().isEmpty) {
+      setState(() => _error = 'Please enter your phone number');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final response = await http.post(
+        Uri.parse(AppConfig.checkUserUrl),
+        body: {'phone_number': _phoneController.text.trim()},
+      ).timeout(const Duration(seconds: 10));
+      if (!mounted) return;
+      final data = json.decode(response.body);
+      if (data['status'] == 'success') {
+        setState(() => _isOtpSent = true);
+        _otpFocusNodes[0].requestFocus();
+        _showSuccess('Verification code sent to your device');
+      } else {
+        setState(() => _error = data['message'] ?? 'Phone number not found');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(
+          () => _error = 'Unable to connect. Check your internet and try again.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _verifyOtp() async {
+    setState(() => _error = null);
+    if (_combinedOtp.length < 4) {
+      setState(() => _error = 'Please enter the complete 4-digit code');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final response = await http.post(
+        Uri.parse(AppConfig.verifyOtpUrl),
+        body: {
+          'phone_number': _phoneController.text.trim(),
+          'otp_code': _combinedOtp,
+        },
+      );
+      if (!mounted) return;
+      final data = json.decode(response.body);
+      if (data['status'] == 'success') {
+        final prefs = await SharedPreferences.getInstance();
+        if (data['user'] != null) {
+          await prefs.setString('user_session', json.encode(data['user']));
+        }
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (_) => HomeDashboard(userData: data['user'])),
+        );
+      } else {
+        setState(() => _error = data['message'] ?? 'Invalid verification code');
+        for (final c in _otpControllers) {
+          c.clear();
+        }
+        _otpFocusNodes[0].requestFocus();
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Verification failed. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
     return Scaffold(
-      body: Stack(
-        children: [
-          // 1. Background Layer
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [bgLight, Colors.white],
-              ),
-            ),
-          ),
-
-          // 2. Floating Health Background Icons
-          _buildFloatingIcon(Icons.medical_information_outlined, top: 80, left: -20, size: 100),
-          _buildFloatingIcon(Icons.history_edu_rounded, top: 220, right: -30, size: 120),
-          _buildFloatingIcon(Icons.health_and_safety_outlined, bottom: 150, left: -30, size: 140),
-          _buildFloatingIcon(Icons.medication_rounded, bottom: 50, right: 20, size: 80),
-          _buildFloatingIcon(Icons.volunteer_activism_rounded, top: 400, left: 30, size: 70),
-
-          // 3. Main UI Layer
-          SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      backgroundColor: tc.scaffoldBg,
+      body: SafeArea(
+        child: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.xxl),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
                 child: Column(
                   children: [
-                    // --- LOGO SECTION ---
-                    _buildLogoHeader(),
-                    
-                    const SizedBox(height: 40),
-
-                    // --- LOGIN CARD ---
-                    _buildLoginCard(),
-
-                    const SizedBox(height: 30),
-
-                    // --- FOOTER ---
-                    _buildFooter(),
+                    const SizedBox(height: AppSpacing.huge),
+                    _buildLogo(tc),
+                    const SizedBox(height: AppSpacing.huge),
+                    _isOtpSent ? _buildOtpCard(tc) : _buildPhoneCard(tc),
+                    const SizedBox(height: AppSpacing.xxl),
+                    if (_isOtpSent) _buildEditPhoneLink(tc),
                   ],
                 ),
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  // --- SUB-WIDGETS ---
-
-  Widget _buildFloatingIcon(IconData icon, {double? top, double? bottom, double? left, double? right, double size = 100}) {
-    return Positioned(
-      top: top, bottom: bottom, left: left, right: right,
-      child: Opacity(
-        opacity: 0.05,
-        child: Icon(icon, size: size, color: primaryGreen),
-      ),
-    );
-  }
-
-  Widget _buildLogoHeader() {
+  Widget _buildLogo(ThemeColors tc) {
     return Column(
       children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-            // Tinanggal na natin ang boxShadow dito
-          ),
-          child: Image.asset('assets/loginlogo.png', height: 100),
-        ),
-        const SizedBox(height: 20),
-        Text(
-          "AK CARE",
-          style: TextStyle(
-            fontSize: 34,
-            fontWeight: FontWeight.w900,
-            color: deepTeal,
-            letterSpacing: 2,
-          ),
-        ),
-        Text(
-          "HEALTHCARE & PERKS",
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey[600],
-            letterSpacing: 4,
-          ),
-        ),
+        Image.asset('assets/loginlogo.png', height: 90),
+        const SizedBox(height: AppSpacing.xxl),
+        Text('AK MIYEMBRO',
+            style: AppTypography.displayLarge.copyWith(color: tc.deepTeal)),
+        const SizedBox(height: AppSpacing.xs),
+        Text('HEALTHCARE & PERKS',
+            style: AppTypography.labelMedium.copyWith(
+                color: tc.neutral60, letterSpacing: 4)),
       ],
     );
   }
 
-  Widget _buildLoginCard() {
+  Widget _buildPhoneCard(ThemeColors tc) {
     return Container(
-      padding: const EdgeInsets.all(30),
+      padding: const EdgeInsets.all(AppSpacing.xxl),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(35),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 40,
-            offset: const Offset(0, 20),
-          )
-        ],
+        color: tc.surface,
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
+        boxShadow: AppElevation.medium,
       ),
       child: Column(
         children: [
-          Text(
-            _isOtpSent ? "Verify OTP" : "Welcome Back",
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _isOtpSent 
-              ? "We've sent a code to your phone" 
-              : "Sign in to manage your health benefits",
-            style: TextStyle(fontSize: 13, color: Colors.grey[500]),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 35),
-
-          if (!_isOtpSent)
-            _buildTextField(
-              controller: _phoneController,
-              label: "Phone Number",
-              hint: "09XXXXXXXXX",
-              icon: Icons.phone_android_rounded,
-              type: TextInputType.phone,
-            )
-          else
-            _buildTextField(
-              controller: _otpController,
-              label: "Enter 6-digit Code",
-              hint: "0 0 0 0 0 0",
-              icon: Icons.shield_moon_outlined,
-              type: TextInputType.number,
-              isOtp: true,
-            ),
-
-          const SizedBox(height: 30),
-
-          // ACTION BUTTON
-          Container(
-            width: double.infinity,
-            height: 58,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              gradient: LinearGradient(
-                colors: [primaryGreen, const Color(0xFF0D7A04)],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: primaryGreen.withOpacity(0.3),
-                  blurRadius: 15,
-                  offset: const Offset(0, 8),
-                )
+          Text('Welcome Back',
+              style: AppTypography.headlineMedium.copyWith(color: tc.neutral100)),
+          const SizedBox(height: AppSpacing.sm),
+          Text('Sign in to manage your health benefits',
+              style: AppTypography.bodyMedium.copyWith(color: tc.neutral60),
+              textAlign: TextAlign.center),
+          const SizedBox(height: AppSpacing.xxxl),
+          _buildPhoneField(tc),
+          if (_error != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                Icon(Icons.error_outline, size: 16, color: tc.error),
+                const SizedBox(width: 6),
+                Expanded(
+                    child: Text(_error!,
+                        style: AppTypography.caption.copyWith(color: tc.error))),
               ],
             ),
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : (_isOtpSent ? _verifyOtp : _requestOtp),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-              ),
-              child: _isLoading
-                  ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : Text(
-                      _isOtpSent ? "CONFIRM & LOGIN" : "GET OTP CODE",
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
-            ),
+          ],
+          const SizedBox(height: AppSpacing.xxl),
+          AppButton(
+            label: 'GET VERIFICATION CODE',
+            onPressed: _isLoading ? null : _requestOtp,
+            icon: Icons.arrow_forward_rounded,
+            isLoading: _isLoading,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    required TextInputType type,
-    bool isOtp = false,
-  }) {
+  Widget _buildPhoneField(ThemeColors tc) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-        ),
+        Text('Phone Number',
+            style: AppTypography.labelMedium.copyWith(color: tc.neutral80)),
+        const SizedBox(height: 6),
         TextField(
-          controller: controller,
-          keyboardType: type,
-          maxLength: isOtp ? 6 : null,
-          textAlign: isOtp ? TextAlign.center : TextAlign.start,
-          style: TextStyle(
-            fontSize: isOtp ? 26 : 16,
-            letterSpacing: isOtp ? 12 : 0,
-            fontWeight: isOtp ? FontWeight.w900 : FontWeight.w500,
-          ),
+          controller: _phoneController,
+          keyboardType: TextInputType.phone,
+          onChanged: (_) => setState(() => _error = null),
+          style: AppTypography.bodyLarge.copyWith(color: tc.neutral100),
           decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(letterSpacing: 0, color: Colors.grey[300], fontSize: 14),
-            prefixIcon: Icon(icon, color: primaryGreen),
-            filled: true,
-            fillColor: bgLight.withOpacity(0.3),
-            counterText: "",
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: Colors.grey[200]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: primaryGreen, width: 1.5),
-            ),
+            hintText: '09XXXXXXXXX',
+            prefixIcon: const Icon(Icons.phone_android_rounded, size: 22),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildFooter() {
-    if (_isOtpSent) {
-      return TextButton.icon(
-        onPressed: () => setState(() => _isOtpSent = false),
-        icon: const Icon(Icons.arrow_back),
-        label: const Text("Edit Phone Number"),
-        style: TextButton.styleFrom(foregroundColor: primaryGreen),
-      );
-    }
-    return Column(
-      children: [
-        // const Text("Don't have an account?", style: TextStyle(color: Colors.grey, fontSize: 13)),
-        // TextButton(
-        //   onPressed: () {},
-        //   child: Text("Contact Administrator", style: TextStyle(color: primaryGreen, fontWeight: FontWeight.bold)),
-        // ),
-      ],
+  Widget _buildOtpCard(ThemeColors tc) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xxl),
+      decoration: BoxDecoration(
+        color: tc.surface,
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
+        boxShadow: AppElevation.medium,
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: tc.primarySurface,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+            ),
+            child: Icon(Icons.shield_moon_outlined, color: tc.primary, size: 32),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text('Verify Your Identity',
+              style: AppTypography.headlineMedium.copyWith(color: tc.neutral100)),
+          const SizedBox(height: AppSpacing.sm),
+          Text('We sent a 4-digit code to your device',
+              style: AppTypography.bodyMedium.copyWith(color: tc.neutral60),
+              textAlign: TextAlign.center),
+          const SizedBox(height: AppSpacing.xxxl),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(4, (i) {
+              return Container(
+                width: 60,
+                height: 56,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                child: TextField(
+                  controller: _otpControllers[i],
+                  focusNode: _otpFocusNodes[i],
+                  keyboardType: TextInputType.number,
+                  maxLength: 1,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.headlineMedium.copyWith(
+                      color: tc.neutral100, letterSpacing: 0),
+                  decoration: InputDecoration(
+                    counterText: '',
+                    contentPadding: EdgeInsets.zero,
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md)),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        borderSide: BorderSide(color: tc.primary, width: 2)),
+                  ),
+                  onChanged: (v) {
+                    if (v.isNotEmpty && i < 3) {
+                      _otpFocusNodes[i + 1].requestFocus();
+                    }
+                    if (v.isEmpty && i > 0) {
+                      _otpFocusNodes[i - 1].requestFocus();
+                    }
+                    if (_combinedOtp.length == 4) {
+                      FocusScope.of(context).unfocus();
+                    }
+                    setState(() => _error = null);
+                  },
+                ),
+              );
+            }),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 16, color: tc.error),
+                const SizedBox(width: 6),
+                Text(_error!, style: AppTypography.caption.copyWith(color: tc.error)),
+              ],
+            ),
+          ],
+          const SizedBox(height: AppSpacing.xxxl),
+          AppButton(
+            label: 'CONFIRM & LOGIN',
+            onPressed: _isLoading ? null : _verifyOtp,
+            icon: Icons.lock_open_rounded,
+            isLoading: _isLoading,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditPhoneLink(ThemeColors tc) {
+    return TextButton.icon(
+      onPressed: () => setState(() {
+        _isOtpSent = false;
+        for (final c in _otpControllers) c.clear();
+        _error = null;
+      }),
+      icon: const Icon(Icons.edit_outlined, size: 18),
+      label: const Text('Edit Phone Number'),
+      style: TextButton.styleFrom(foregroundColor: tc.neutral70),
     );
   }
 }
