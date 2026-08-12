@@ -28,6 +28,12 @@ class MedicalCertificate {
   final String restTo;
   final String remarks;
 
+  /// The examination the certificate rests on: the date of the consultation it
+  /// was issued against, or — when there wasn't one in the system — the reason
+  /// the doctor gave for issuing anyway. Exactly one of the two is set.
+  final String consultationOn;
+  final String issuedWithoutConsultationReason;
+
   /// The doctor's name and PRC licence number: without them a certificate is
   /// not verifiable, and this app deliberately shows both.
   final String issuedBy;
@@ -54,6 +60,8 @@ class MedicalCertificate {
     required this.restFrom,
     required this.restTo,
     required this.remarks,
+    required this.consultationOn,
+    required this.issuedWithoutConsultationReason,
     required this.issuedBy,
     required this.issuedLicense,
     required this.issuedAt,
@@ -95,6 +103,9 @@ class MedicalCertificate {
       restFrom: _str(json['rest_from']),
       restTo: _str(json['rest_to']),
       remarks: _str(json['remarks']),
+      consultationOn: _str(json['consultation_on']),
+      issuedWithoutConsultationReason:
+          _str(json['issued_without_consultation_reason']),
       issuedBy: _str(json['issued_by']),
       issuedLicense: _str(json['issued_license']),
       issuedAt: _str(json['issued_at']),

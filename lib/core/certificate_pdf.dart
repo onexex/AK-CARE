@@ -76,6 +76,19 @@ Future<List<int>> buildCertificatePdf({
           _row('Date examined',
               cert.examinedOn.isNotEmpty ? formatDate(cert.examinedOn) : '—'),
 
+          // What the certificate rests on. A reader who wants to check this
+          // document needs to know which examination it refers to — and where
+          // there was none on record, saying so is the honest alternative to
+          // leaving the question unasked.
+          _row(
+            'Basis',
+            cert.consultationOn.isNotEmpty
+                ? 'Teleconsultation of ${formatDate(cert.consultationOn)}'
+                : cert.issuedWithoutConsultationReason.isNotEmpty
+                    ? 'Issued without a consultation on record — ${cert.issuedWithoutConsultationReason}'
+                    : '—',
+          ),
+
           pw.SizedBox(height: 16),
 
           // ── Findings ──

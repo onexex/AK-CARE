@@ -30,6 +30,11 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
   /// have never asked for a certificate".
   String? _error;
 
+  /// Whether this member has ever been examined on record. A doctor needs an
+  /// examination before issuing, so the request form says so up front rather
+  /// than letting the member find out days later through a rejection.
+  bool _hasConsultation = true;
+
   @override
   void initState() {
     super.initState();
@@ -50,6 +55,9 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
               .map((e) => MedicalCertificate.fromJson(
                   Map<String, dynamic>.from(e as Map)))
               .toList();
+          // Absent on an older server: assume they have been seen rather than
+          // warn every member on the strength of a missing field.
+          _hasConsultation = data['has_consultation'] != false;
           _isLoading = false;
         });
         return;
@@ -135,6 +143,12 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
                 _detailRow(tc, 'Patient', cert.patientName),
               if (cert.examinedOn.isNotEmpty)
                 _detailRow(tc, 'Date examined', formatDate(cert.examinedOn)),
+              if (cert.consultationOn.isNotEmpty)
+                _detailRow(tc, 'Based on',
+                    'Teleconsultation of ${formatDate(cert.consultationOn)}')
+              else if (cert.issuedWithoutConsultationReason.isNotEmpty)
+                _detailRow(tc, 'Based on',
+                    'Issued without a consultation on record — ${cert.issuedWithoutConsultationReason}'),
               if (cert.diagnosis.isNotEmpty)
                 _detailRow(tc, 'Diagnosis', cert.diagnosis),
               if (cert.fitnessLabel.isNotEmpty)
@@ -222,7 +236,36 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
                 children: [
                   Text('Request Medical Certificate',
                       style: AppTypography.headlineMedium.copyWith(color: tc.neutral100)),
-                  const SizedBox(height: AppSpacing.xxl),
+                  const SizedBox(height: AppSpacing.lg),
+
+                  // Said before they type, not after: a doctor cannot certify
+                  // someone they have not examined, so a member with no
+                  // consultation on record is likely to be asked for one.
+                  if (!_hasConsultation)
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: AppColors.featureCertificate.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.info_outline_rounded,
+                              size: 18, color: AppColors.featureCertificate),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              'You have no consultation on record. A doctor will need to examine you before a certificate can be issued — book a teleconsultation first if you have not been seen.',
+                              style: AppTypography.bodySmall
+                                  .copyWith(color: tc.neutral80),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (!_hasConsultation) const SizedBox(height: AppSpacing.lg),
+                  const SizedBox(height: AppSpacing.md),
                   Text('Reason', style: AppTypography.labelMedium.copyWith(color: tc.neutral80)),
                   const SizedBox(height: AppSpacing.sm),
                   TextField(
