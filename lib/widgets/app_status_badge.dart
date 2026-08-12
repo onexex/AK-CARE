@@ -20,22 +20,22 @@ class AppStatusBadge extends StatelessWidget {
     return switch (raw.toLowerCase()) {
       'completed' => AppStatusBadge(
           status: 'Completed',
-          color: tc.success,
+          color: tc.successText,
           backgroundColor: tc.successSurface,
         ),
       'confirmed' => AppStatusBadge(
           status: 'Confirmed',
-          color: tc.info,
+          color: tc.infoText,
           backgroundColor: tc.infoSurface,
         ),
       'cancelled' => AppStatusBadge(
           status: 'Cancelled',
-          color: tc.error,
+          color: tc.errorText,
           backgroundColor: tc.errorSurface,
         ),
       _ => AppStatusBadge(
           status: 'Pending',
-          color: tc.warning,
+          color: tc.warningText,
           backgroundColor: tc.warningSurface,
         ),
     };
@@ -53,7 +53,7 @@ class AppStatusBadge extends StatelessWidget {
       child: Text(
         status,
         style: AppTypography.labelSmall.copyWith(
-          color: color ?? tc.neutral70,
+          color: color ?? tc.textSecondary,
           fontWeight: FontWeight.w700,
         ),
       ),

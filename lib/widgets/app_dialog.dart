@@ -64,7 +64,7 @@ class AppDialog extends StatelessWidget {
           children: [
             if (icon != null) ...[
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
                   color: isDestructive ? tc.errorSurface : tc.primarySurface,
                   shape: BoxShape.circle,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../core/config.dart';
+import '../core/format.dart';
 import '../design_system/app_colors.dart';
 import '../design_system/theme_colors.dart';
 import '../design_system/app_radius.dart';
@@ -33,9 +34,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   String _initials(String name) {
-    final parts = (name ?? '').trim().split(' ');
+    final parts = name.trim().split(' ');
     if (parts.length >= 2) return '${parts[0][0]}${parts[parts.length - 1][0]}'.toUpperCase();
-    return (name ?? '').isNotEmpty ? name[0].toUpperCase() : '?';
+    return name.isNotEmpty ? name[0].toUpperCase() : '?';
   }
 
   Future<void> _logout(BuildContext context) async {
@@ -55,35 +56,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     showModalBottomSheet(context: context, isScrollControlled: true, useSafeArea: true, showDragHandle: true,
       builder: (ctx) => StatefulBuilder(builder: (context, setModalState) {
+        final tc = ThemeColors.of(context);
         return Padding(padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.xxl, left: AppSpacing.xxl, right: AppSpacing.xxl),
           child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
             const SizedBox(height: AppSpacing.sm),
-            Text('Edit Profile', style: AppTypography.headlineMedium.copyWith(color: AppColors.neutral100)),
+            Text('Edit Profile', style: AppTypography.headlineMedium.copyWith(color: tc.neutral100)),
             const SizedBox(height: AppSpacing.xxl),
-            Text('Mobile Number', style: AppTypography.labelMedium.copyWith(color: AppColors.neutral80)), const SizedBox(height: AppSpacing.sm),
+            Text('Mobile Number', style: AppTypography.labelMedium.copyWith(color: tc.neutral80)), const SizedBox(height: AppSpacing.sm),
             TextField(controller: contactCtrl, enabled: !isSaving, decoration: const InputDecoration(hintText: '09XXXXXXXXX')),
             const SizedBox(height: AppSpacing.lg),
-            Text('First Name', style: AppTypography.labelMedium.copyWith(color: AppColors.neutral80)), const SizedBox(height: AppSpacing.sm),
+            Text('First Name', style: AppTypography.labelMedium.copyWith(color: tc.neutral80)), const SizedBox(height: AppSpacing.sm),
             TextField(controller: fnameCtrl, enabled: !isSaving, decoration: const InputDecoration(hintText: 'Enter first name')),
             const SizedBox(height: AppSpacing.lg),
-            Text('Last Name', style: AppTypography.labelMedium.copyWith(color: AppColors.neutral80)), const SizedBox(height: AppSpacing.sm),
+            Text('Last Name', style: AppTypography.labelMedium.copyWith(color: tc.neutral80)), const SizedBox(height: AppSpacing.sm),
             TextField(controller: lnameCtrl, enabled: !isSaving, decoration: const InputDecoration(hintText: 'Enter last name')),
             const SizedBox(height: AppSpacing.xxl),
             AppButton(label: 'SAVE CHANGES', icon: Icons.save_rounded, isLoading: isSaving, onPressed: isSaving ? null : () async {
               setModalState(() => isSaving = true);
+              // Resolved before the async gap; the sheet's context is defunct once popped.
+              final messenger = ScaffoldMessenger.of(context);
+              final navigator = Navigator.of(ctx);
               try {
                 final res = await http.post(Uri.parse('${AppConfig.baseUrl}/update_profile.php'), body: {'user_id': _user['id']?.toString() ?? '', 'contact': contactCtrl.text.trim(), 'm_fname': fnameCtrl.text.trim(), 'm_surname': lnameCtrl.text.trim()}).timeout(AppConfig.apiTimeout);
                 final result = jsonDecode(res.body);
                 if (result['status'] == 'success') {
-                  setState(() { _user['contact'] = contactCtrl.text.trim(); _user['full_name'] = '${fnameCtrl.text.trim()} ${lnameCtrl.text.trim()}'.trim(); });
+                  if (mounted) setState(() { _user['contact'] = contactCtrl.text.trim(); _user['full_name'] = '${fnameCtrl.text.trim()} ${lnameCtrl.text.trim()}'.trim(); });
                   final prefs = await SharedPreferences.getInstance(); await prefs.setString('user_session', jsonEncode(_user));
-                  Navigator.pop(ctx);
-                  if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated successfully'), backgroundColor: Colors.green, behavior: SnackBarBehavior.floating)); }
+                  navigator.pop();
+                  messenger.showSnackBar(const SnackBar(content: Text('Profile updated successfully'), backgroundColor: Colors.green, behavior: SnackBarBehavior.floating));
                 } else {
-                  setModalState(() => isSaving = false);
-                  if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result['message'] ?? 'Update failed'), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating)); }
+                  if (ctx.mounted) setModalState(() => isSaving = false);
+                  messenger.showSnackBar(SnackBar(content: Text(result['message'] ?? 'Update failed'), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating));
                 }
-              } catch (_) { setModalState(() => isSaving = false); if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Network error. Try again.'), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating)); } }
+              } catch (_) { if (ctx.mounted) setModalState(() => isSaving = false); messenger.showSnackBar(const SnackBar(content: Text('Network error. Try again.'), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating)); }
             }),
           ])));
       }));
@@ -109,15 +114,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs), decoration: BoxDecoration(color: tc.primarySurface, borderRadius: BorderRadius.circular(AppRadius.full)),
               child: Text(rank.toUpperCase(), style: AppTypography.labelSmall.copyWith(color: tc.primary, letterSpacing: 1))),
           ])),
-        AppSectionHeader(title: 'Account Details'), const SizedBox(height: AppSpacing.sm),
+        const AppSectionHeader(title: 'Account Details'), const SizedBox(height: AppSpacing.sm),
         Padding(padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg), child: Column(children: [
-          _infoTile(Icons.fingerprint, 'Member ID', userId, tc), _infoTile(Icons.phone_android_rounded, 'Mobile Number', contact, tc), _infoTile(Icons.badge_rounded, 'Account Type', rank, tc),
+          _infoTile(Icons.fingerprint, 'Member ID', userId, tc), _infoTile(Icons.phone_android_rounded, 'Mobile Number', formatPhMobile(contact), tc), _infoTile(Icons.badge_rounded, 'Account Type', rank, tc),
         ])),
         const SizedBox(height: AppSpacing.xxl),
-        AppSectionHeader(title: 'Actions'), const SizedBox(height: AppSpacing.sm),
+        const AppSectionHeader(title: 'Actions'), const SizedBox(height: AppSpacing.sm),
         Padding(padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg), child: Column(children: [
-          _actionTile(Icons.dark_mode_outlined, 'Dark Mode', () => themeController.toggle(), tc),
-          _actionTile(Icons.edit_outlined, 'Edit Profile Information', _showEditSheet, tc),
+          _actionTile(Icons.dark_mode_outlined, 'Dark Mode', () => themeController.toggle(), tc,
+              trailing: Switch(
+                value: tc.isDark,
+                onChanged: (_) => themeController.toggle(),
+              )),
+          const SizedBox(height: AppSpacing.sm),
+          _actionTile(Icons.edit_outlined, 'Edit Profile Information', _showEditSheet, tc,
+              trailing: Icon(Icons.chevron_right, color: tc.neutral50, size: 20)),
           const SizedBox(height: AppSpacing.sm),
           _actionTile(Icons.logout_rounded, 'Log Out', () => _logout(context), tc, isDestructive: true),
         ])),
@@ -132,13 +143,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Container(padding: const EdgeInsets.all(AppSpacing.sm), decoration: BoxDecoration(color: tc.primarySurface, borderRadius: BorderRadius.circular(AppRadius.sm)), child: Icon(icon, color: tc.primary, size: 20)),
         const SizedBox(width: AppSpacing.lg),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: AppTypography.caption.copyWith(color: tc.neutral60)), const SizedBox(height: 2),
+          Text(label, style: AppTypography.caption.copyWith(color: tc.textSecondary)), const SizedBox(height: 2),
           Text(value, style: AppTypography.bodyLarge.copyWith(color: tc.neutral100, fontWeight: FontWeight.w600)),
         ])),
       ]));
   }
 
-  Widget _actionTile(IconData icon, String label, VoidCallback onTap, ThemeColors tc, {bool isDestructive = false}) {
+  /// A row in Actions. [trailing] says what kind of row it is: a chevron means
+  /// it opens something, a switch means it toggles, nothing means it acts on the
+  /// spot. Every row used to show a chevron, which promised navigation from a
+  /// theme toggle and from Log Out.
+  Widget _actionTile(IconData icon, String label, VoidCallback onTap, ThemeColors tc, {bool isDestructive = false, Widget? trailing}) {
     return Material(color: tc.surface, borderRadius: BorderRadius.circular(AppRadius.lg),
       child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(AppRadius.lg),
         child: Container(padding: const EdgeInsets.all(AppSpacing.lg), decoration: BoxDecoration(borderRadius: BorderRadius.circular(AppRadius.lg), boxShadow: AppElevation.subtle),
@@ -147,7 +162,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Icon(icon, color: isDestructive ? tc.error : tc.primary, size: 20)),
             const SizedBox(width: AppSpacing.lg),
             Expanded(child: Text(label, style: AppTypography.bodyLarge.copyWith(color: isDestructive ? tc.error : tc.neutral100, fontWeight: FontWeight.w600))),
-            Icon(Icons.chevron_right, color: isDestructive ? tc.error.withOpacity(0.4) : tc.neutral50, size: 20),
+            if (trailing != null) trailing,
           ]))));
   }
 }

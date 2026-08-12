@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../core/config.dart';
-import '../design_system/app_colors.dart';
+import '../core/format.dart';
+import '../design_system/theme_colors.dart';
 import '../design_system/app_radius.dart';
 import '../design_system/app_spacing.dart';
 import '../design_system/app_typography.dart';
 import '../design_system/app_elevation.dart';
 import '../widgets/app_empty_state.dart';
-import '../widgets/app_status_badge.dart';
 
 class HistoryScreen extends StatefulWidget {
   final String userId;
@@ -68,6 +68,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   void _showDetails(Map<String, dynamic> item) {
+    // Resolved from this State's context so the whole sheet closure, including
+    // the _detailRow helpers, can colour itself for the active theme.
+    final tc = ThemeColors.of(context);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -86,13 +89,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
-                    color: AppColors.primarySurface,
+                    color: tc.primarySurface,
                     borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
-                  child: const Icon(Icons.medical_services_rounded,
-                      color: AppColors.primary),
+                  child: Icon(Icons.medical_services_rounded,
+                      color: tc.primary),
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
@@ -101,31 +104,32 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     children: [
                       Text('Consultation Detail',
                           style: AppTypography.titleLarge
-                              .copyWith(color: AppColors.neutral100)),
+                              .copyWith(color: tc.neutral100)),
                       Text('ID: ${item['p_ctrlID'] ?? 'N/A'}',
                           style: AppTypography.caption
-                              .copyWith(color: AppColors.neutral60)),
+                              .copyWith(color: tc.textSecondary)),
                     ],
                   ),
                 ),
-                AppStatusBadge.fromStatus(context, item['status'] ?? 'Pending'),
+                // Badge omitted for the same reason as the list row: there is no
+                // status field behind it.
               ],
             ),
             const SizedBox(height: AppSpacing.xxl),
             if (_hasValue(item['p_patient']))
-              _detailRow('Patient Name', item['p_patient']),
+              _detailRow(tc, 'Patient Name', item['p_patient']),
             if (_hasValue(item['p_complaint']))
-              _detailRow('Chief Complaint', item['p_complaint']),
+              _detailRow(tc, 'Chief Complaint', item['p_complaint']),
             if (_hasValue(item['p_history']))
-              _detailRow('Medical History', item['p_history']),
+              _detailRow(tc, 'Medical History', item['p_history']),
             if (_hasValue(item['p_medication']))
-              _detailRow('Current Medication', item['p_medication']),
+              _detailRow(tc, 'Current Medication', item['p_medication']),
             if (_hasValue(item['p_med']))
-              _detailRow('Prescribed Medicine', item['p_med']),
+              _detailRow(tc, 'Prescribed Medicine', item['p_med']),
             if (_hasValue(item['p_others']))
-              _detailRow('Other Notes', item['p_others']),
+              _detailRow(tc, 'Other Notes', item['p_others']),
             if (_hasValue(item['p_trasfer_comment']))
-              _detailRow('Transfer Comment', item['p_trasfer_comment']),
+              _detailRow(tc, 'Transfer Comment', item['p_trasfer_comment']),
           ],
         ),
       ),
@@ -135,7 +139,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   bool _hasValue(dynamic v) =>
       v != null && v.toString().isNotEmpty && v.toString() != 'None';
 
-  Widget _detailRow(String label, String value) {
+  Widget _detailRow(ThemeColors tc, String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.lg),
       child: Column(
@@ -143,13 +147,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
         children: [
           Text(label,
               style: AppTypography.labelMedium
-                  .copyWith(color: AppColors.neutral60)),
+                  .copyWith(color: tc.textSecondary)),
           const SizedBox(height: AppSpacing.xs),
           Text(value,
               style: AppTypography.bodyLarge
-                  .copyWith(color: AppColors.neutral90)),
+                  .copyWith(color: tc.neutral90)),
           const SizedBox(height: AppSpacing.sm),
-          const Divider(color: AppColors.neutral30),
+          Divider(color: tc.neutral30),
         ],
       ),
     );
@@ -157,8 +161,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
     return Scaffold(
-      backgroundColor: AppColors.scaffoldBg,
+      backgroundColor: tc.scaffoldBg,
       appBar: AppBar(title: const Text('Consultation History')),
       body: Column(
         children: [
@@ -181,7 +186,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       )
                     : null,
                 filled: true,
-                fillColor: AppColors.surface,
+                fillColor: tc.surface,
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppRadius.md),
                     borderSide: BorderSide.none),
@@ -228,7 +233,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.md),
                         child: Material(
-                          color: AppColors.surface,
+                          color: tc.surface,
                           borderRadius:
                               BorderRadius.circular(AppRadius.lg),
                           child: InkWell(
@@ -247,13 +252,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   Container(
                                     padding: const EdgeInsets.all(AppSpacing.md),
                                     decoration: BoxDecoration(
-                                      color: AppColors.primarySurface,
+                                      color: tc.primarySurface,
                                       borderRadius:
                                           BorderRadius.circular(AppRadius.md),
                                     ),
-                                    child: const Icon(
+                                    child: Icon(
                                         Icons.medical_services_rounded,
-                                        color: AppColors.primary,
+                                        color: tc.primary,
                                         size: 22),
                                   ),
                                   const SizedBox(width: AppSpacing.md),
@@ -266,23 +271,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                             style: AppTypography.titleMedium
                                                 .copyWith(
                                                     color:
-                                                        AppColors.neutral100),
+                                                        tc.neutral100),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis),
                                         const SizedBox(height: 4),
-                                        Text(item['created_at'] ?? '',
+                                        Text(
+                                            formatRelativeDate(
+                                                item['created_at'] ?? ''),
                                             style: AppTypography.caption
                                                 .copyWith(
                                                     color:
-                                                        AppColors.neutral60)),
+                                                        tc.textSecondary)),
                                       ],
                                     ),
                                   ),
-                                  AppStatusBadge.fromStatus(
-                                      context, item['status'] ?? 'Pending'),
-                                  const SizedBox(width: AppSpacing.sm),
-                                  const Icon(Icons.chevron_right,
-                                      color: AppColors.neutral50, size: 20),
+                                  // No status badge here. tblcrmlogsdata has no
+                                  // 'status' column, so this read null and fell
+                                  // through to 'Pending' on every row —
+                                  // consultations from 2022 included. The only
+                                  // candidate is doctor_status, a 0/1 flag whose
+                                  // meaning is not settled; restore the badge
+                                  // once it is, rather than assert something
+                                  // false about a medical record.
+                                  Icon(Icons.chevron_right,
+                                      color: tc.neutral50, size: 20),
                                 ],
                               ),
                             ),

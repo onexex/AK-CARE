@@ -3,7 +3,9 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/config.dart';
+import '../core/format.dart';
 import '../design_system/app_colors.dart';
+import '../design_system/theme_colors.dart';
 import '../design_system/app_radius.dart';
 import '../design_system/app_spacing.dart';
 import '../design_system/app_typography.dart';
@@ -78,9 +80,18 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
       isDestructive: true,
       icon: Icons.cancel_outlined,
     );
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true) return;
+    // Kept separate from the check above: folded into one condition, the
+    // analyser cannot see this as a mounted guard for the context used below.
+    if (!mounted) return;
 
     setState(() => _isLoading = true);
+
+    // Resolved before the request goes out. If the user leaves this screen while
+    // it is in flight, reading ScaffoldMessenger from a defunct context throws;
+    // the messenger itself lives above the route and stays valid.
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
       final response = await http.post(
         Uri.parse('${AppConfig.baseUrl}/cancel_request.php'),
@@ -88,19 +99,19 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
       ).timeout(const Duration(seconds: 10));
       final result = jsonDecode(response.body);
       if (result['status'] == 'success') {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(
               content: Text('Request cancelled successfully.'),
               backgroundColor: AppColors.success,
               behavior: SnackBarBehavior.floating),
         );
-        _fetchRequests();
+        if (mounted) _fetchRequests();
       } else {
         throw Exception(result['message'] ?? 'Failed');
       }
     } catch (e) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) setState(() => _isLoading = false);
+      messenger.showSnackBar(
         SnackBar(
             content: Text('Error: Could not cancel request. $e'),
             backgroundColor: AppColors.error,
@@ -120,54 +131,58 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
         maxChildSize: 0.85,
         minChildSize: 0.35,
         expand: false,
-        builder: (context, scrollController) => ListView(
-          controller: scrollController,
-          padding: const EdgeInsets.fromLTRB(
-              AppSpacing.xxl, 0, AppSpacing.xxl, AppSpacing.xxxl),
-          children: [
-            Row(
-              children: [
-                Text('Request Details',
-                    style: AppTypography.titleLarge
-                        .copyWith(color: AppColors.neutral100)),
-                const Spacer(),
-                AppStatusBadge.fromStatus(context, req['status'] ?? 'Pending'),
-              ],
-            ),
-            const Divider(height: AppSpacing.xxxl),
-            _detailRow('Reason', req['consultation_reason'] ?? 'N/A'),
-            _detailRow('Preferred Date', req['preferred_date'] ?? 'N/A'),
-            _detailRow('Request ID', '#${req['request_id'] ?? 'N/A'}'),
-            _detailRow(
-                'Status', (req['status'] ?? 'Pending').toUpperCase()),
-            if ((req['status'] ?? '').toString().toLowerCase() == 'pending') ...[
-              const SizedBox(height: AppSpacing.xxl),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _cancelRequest(req['request_id'].toString());
-                  },
-                  icon: const Icon(Icons.cancel_outlined, size: 20),
-                  label: const Text('CANCEL REQUEST'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.error,
-                    side: const BorderSide(color: AppColors.error),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md)),
+        builder: (context, scrollController) {
+          final tc = ThemeColors.of(context);
+          return ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.xxl, 0, AppSpacing.xxl, AppSpacing.xxxl),
+            children: [
+              Row(
+                children: [
+                  Text('Request Details',
+                      style: AppTypography.titleLarge
+                          .copyWith(color: tc.neutral100)),
+                  const Spacer(),
+                  AppStatusBadge.fromStatus(context, req['status'] ?? 'Pending'),
+                ],
+              ),
+              const Divider(height: AppSpacing.xxxl),
+              _detailRow(tc, 'Reason', req['consultation_reason'] ?? 'N/A'),
+              _detailRow(tc, 'Preferred Date',
+                  formatDate(req['preferred_date'] ?? '')),
+              _detailRow(tc, 'Request ID', '#${req['request_id'] ?? 'N/A'}'),
+              _detailRow(
+                  tc, 'Status', (req['status'] ?? 'Pending').toUpperCase()),
+              if ((req['status'] ?? '').toString().toLowerCase() == 'pending') ...[
+                const SizedBox(height: AppSpacing.xxl),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _cancelRequest(req['request_id'].toString());
+                    },
+                    icon: const Icon(Icons.cancel_outlined, size: 20),
+                    label: const Text('CANCEL REQUEST'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: tc.error,
+                      side: BorderSide(color: tc.error),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md)),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-  Widget _detailRow(String label, String value) {
+  Widget _detailRow(ThemeColors tc, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
       child: Row(
@@ -177,11 +192,11 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
               width: 120,
               child: Text(label,
                   style: AppTypography.bodyMedium
-                      .copyWith(color: AppColors.neutral60))),
+                      .copyWith(color: tc.textSecondary))),
           Expanded(
               child: Text(value,
                   style: AppTypography.bodyMedium.copyWith(
-                      color: AppColors.neutral90,
+                      color: tc.neutral90,
                       fontWeight: FontWeight.w600))),
         ],
       ),
@@ -198,9 +213,10 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
     final filtered = _filtered();
     return Scaffold(
-      backgroundColor: AppColors.scaffoldBg,
+      backgroundColor: tc.scaffoldBg,
       appBar: AppBar(
         title: const Text('My Consult Requests'),
         actions: [
@@ -212,35 +228,35 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
       ),
       body: Column(
         children: [
-          SizedBox(
-            height: 48,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-              itemCount: _filters.length,
-              itemBuilder: (context, i) {
+          // Sizes to its children rather than a fixed 48dp box, so the chips
+          // grow with the system font instead of clipping. A handful of filters
+          // does not need a lazy builder.
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+            child: Row(
+              children: List.generate(_filters.length, (i) {
                 final sel = _selectedFilter == _filters[i];
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
                   child: FilterChip(
                     label: Text(_filters[i]),
                     selected: sel,
                     onSelected: (_) =>
                         setState(() => _selectedFilter = _filters[i]),
-                    backgroundColor: AppColors.surface,
-                    selectedColor: AppColors.primarySurface,
-                    checkmarkColor: AppColors.primary,
+                    backgroundColor: tc.surface,
+                    selectedColor: tc.primarySurface,
+                    checkmarkColor: tc.primary,
                     labelStyle: AppTypography.labelMedium.copyWith(
-                        color:
-                            sel ? AppColors.primary : AppColors.neutral70),
+                        color: sel ? tc.primaryText : tc.textSecondary),
                     side: BorderSide.none,
                     shape: RoundedRectangleBorder(
                         borderRadius:
                             BorderRadius.circular(AppRadius.full)),
                   ),
                 );
-              },
+              }),
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -274,7 +290,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
                                 padding: const EdgeInsets.only(
                                     bottom: AppSpacing.md),
                                 child: Material(
-                                  color: AppColors.surface,
+                                  color: tc.surface,
                                   borderRadius:
                                       BorderRadius.circular(AppRadius.lg),
                                   child: InkWell(
@@ -295,15 +311,15 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
                                             padding: const EdgeInsets.all(
                                                 AppSpacing.md),
                                             decoration: BoxDecoration(
-                                              color: AppColors.primarySurface,
+                                              color: tc.primarySurface,
                                               borderRadius:
                                                   BorderRadius.circular(
                                                       AppRadius.md),
                                             ),
-                                            child: const Icon(
+                                            child: Icon(
                                                 Icons
                                                     .medical_services_outlined,
-                                                color: AppColors.primary,
+                                                color: tc.primary,
                                                 size: 22),
                                           ),
                                           const SizedBox(
@@ -319,31 +335,57 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
                                                     style: AppTypography
                                                         .titleMedium
                                                         .copyWith(
-                                                            color: AppColors
+                                                            color: tc
                                                                 .neutral100),
                                                     maxLines: 1,
                                                     overflow: TextOverflow
                                                         .ellipsis),
                                                 const SizedBox(height: 4),
+                                                // Both labels are Flexible: as
+                                                // fixed-width Text they overflowed
+                                                // the row by a few pixels once real
+                                                // requests loaded, which only showed
+                                                // up when this list stopped being
+                                                // empty. The date gives way first;
+                                                // the id is short and rarely needs to.
                                                 Row(
                                                   children: [
-                                                    Text(
-                                                        'Preferred: ${req['preferred_date'] ?? 'N/A'}',
-                                                        style: AppTypography
-                                                            .caption
-                                                            .copyWith(
-                                                                color: AppColors
-                                                                    .neutral60)),
+                                                    Flexible(
+                                                      // No 'Preferred:' prefix.
+                                                      // With it, the date lost
+                                                      // its year to ellipsis —
+                                                      // and in a list of consult
+                                                      // requests the label is
+                                                      // saying what the reader
+                                                      // already knows. The detail
+                                                      // sheet names the field.
+                                                      child: Text(
+                                                          formatDate(req['preferred_date'] ?? ''),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                          style: AppTypography
+                                                              .caption
+                                                              .copyWith(
+                                                                  color: tc
+                                                                      .textSecondary)),
+                                                    ),
                                                     const SizedBox(
                                                         width:
-                                                            AppSpacing.md),
+                                                            AppSpacing.sm),
+                                                    // Not Flexible: the id is two
+                                                    // or three characters and
+                                                    // should take its natural
+                                                    // width. Flexing both made
+                                                    // them share the space and
+                                                    // ellipsised the date away.
                                                     Text(
                                                         '#${req['request_id'] ?? 'N/A'}',
                                                         style: AppTypography
                                                             .caption
                                                             .copyWith(
-                                                                color: AppColors
-                                                                    .neutral50)),
+                                                                color: tc
+                                                                    .textMuted)),
                                                   ],
                                                 ),
                                               ],
@@ -353,8 +395,8 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
                                               context, req['status'] ?? 'Pending'),
                                           const SizedBox(
                                               width: AppSpacing.sm),
-                                          const Icon(Icons.chevron_right,
-                                              color: AppColors.neutral50,
+                                          Icon(Icons.chevron_right,
+                                              color: tc.neutral50,
                                               size: 20),
                                         ],
                                       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import '../core/format.dart';
 import '../models/community_post.dart';
 import '../services/community_service.dart';
 import '../design_system/app_colors.dart';
@@ -183,7 +184,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                           itemBuilder: (context, index) {
                             if (index >= _posts.length) {
                               return const Padding(
-                                padding: EdgeInsets.all(16),
+                                padding: EdgeInsets.all(AppSpacing.lg),
                                 child:
                                     Center(child: CircularProgressIndicator()),
                               );
@@ -229,14 +230,14 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
             Expanded(
               child: Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
                 decoration: BoxDecoration(
                   color: tc.neutral10,
                   borderRadius: BorderRadius.circular(AppRadius.lg),
                 ),
                 child: Text("What's on your mind?",
                     style: AppTypography.bodyMedium
-                        .copyWith(color: tc.neutral60)),
+                        .copyWith(color: tc.textSecondary)),
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -280,7 +281,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                                 : '?')
                             .toUpperCase(),
                         style: AppTypography.labelLarge
-                            .copyWith(color: tc.primary),
+                            .copyWith(color: tc.primaryText),
                       ),
                     ),
                   ),
@@ -292,9 +293,9 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                         Text(post.user.fullName,
                             style: AppTypography.titleMedium
                                 .copyWith(color: tc.neutral100)),
-                        Text(_formatDate(post.createdAt),
+                        Text(formatRelativeDate(post.createdAt),
                             style: AppTypography.caption
-                                .copyWith(color: tc.neutral60)),
+                                .copyWith(color: tc.textSecondary)),
                       ],
                     ),
                   ),
@@ -347,7 +348,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                         onTap: () => _openPostDetail(post),
                         child: Text('${post.commentCount} comments',
                             style: AppTypography.caption
-                                .copyWith(color: tc.neutral60)),
+                                .copyWith(color: tc.textSecondary)),
                       ),
                   ],
                 ),
@@ -400,7 +401,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                           const SizedBox(width: 6),
                           Text('Comment',
                               style: AppTypography.labelMedium.copyWith(
-                                  color: tc.neutral60)),
+                                  color: tc.textSecondary)),
                         ],
                       ),
                     ),
@@ -416,7 +417,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
 
   Widget _buildImageCollage(CommunityPost post, ThemeColors tc) {
     final count = post.images.length;
-    final baseUrl = AppConfig.baseUrl;
+    const baseUrl = AppConfig.baseUrl;
 
     Widget imageBox(String path, {double? width, double? height}) {
       return GestureDetector(
@@ -424,15 +425,19 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(AppRadius.xs),
           child: SizedBox(
-            width: width,
+            // Without a width this sizes to its child, and the error placeholder
+            // is only as wide as its icon — so a failed image collapsed to a
+            // sliver while keeping its full height, leaving a tall blank gap in
+            // the feed. Multi-image layouts pass an explicit width via Expanded.
+            width: width ?? double.infinity,
             height: height ?? 200,
             child: Image.network(
               '$baseUrl/$path',
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => Container(
                 color: tc.neutral20,
-                child: Icon(Icons.broken_image,
-                    color: tc.neutral50),
+                alignment: Alignment.center,
+                child: Icon(Icons.broken_image, color: tc.neutral50, size: 32),
               ),
             ),
           ),
@@ -596,7 +601,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                 ),
                 if (likes.isEmpty)
                   const Padding(
-                    padding: EdgeInsets.all(32),
+                    padding: EdgeInsets.all(AppSpacing.xxxl),
                     child: Text('No likes yet.'),
                   )
                 else ...[
@@ -617,7 +622,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                                     : '?')
                                 .toUpperCase(),
                             style: AppTypography.labelMedium
-                                .copyWith(color: tc.primary),
+                                .copyWith(color: tc.primaryText),
                           ),
                         ),
                       ),
@@ -723,19 +728,6 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
     }
   }
 
-  String _formatDate(String iso) {
-    try {
-      final dt = DateTime.parse(iso);
-      final now = DateTime.now();
-      final diff = now.difference(dt);
-      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-      if (diff.inHours < 24) return '${diff.inHours}h ago';
-      if (diff.inDays < 7) return '${diff.inDays}d ago';
-      return '${dt.month}/${dt.day}/${dt.year}';
-    } catch (_) {
-      return iso;
-    }
-  }
 }
 
 class _FullImageScreen extends StatelessWidget {

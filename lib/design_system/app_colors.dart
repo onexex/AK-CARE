@@ -36,6 +36,16 @@ class AppColors {
   static const Color info = Color(0xFF17A2B8);
   static const Color infoSurface = Color(0xFFF0FCFF);
 
+  // ── Feature accents ──
+  // Each module carries its own accent, reused across its dashboard tile, its
+  // icons and its tinted backgrounds. Deliberately identical in both themes —
+  // they are wayfinding, not surfaces, so they are not in ThemeColors.
+  static const Color featureNews = Color(0xFF2196F3);
+  static const Color featureCertificate = Color(0xFFFF9800);
+  static const Color featurePharmacy = Color(0xFFE91E63);
+  static const Color featureCommunity = Color(0xFF9C27B0);
+  static const Color featureEPrescription = Color(0xFF673AB7);
+
   // ── Background ──
   static const Color scaffoldBg = Color(0xFFF5F7FA);
   static const Color surface = Color(0xFFFFFFFF);

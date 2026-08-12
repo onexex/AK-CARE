@@ -8,7 +8,6 @@ import '../design_system/app_radius.dart';
 import '../design_system/app_spacing.dart';
 import '../design_system/app_typography.dart';
 import '../design_system/app_elevation.dart';
-import '../design_system/app_theme.dart';
 import '../widgets/app_button.dart';
 import 'home_dashboard.dart';
 
@@ -41,24 +40,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String get _combinedOtp => _otpControllers.map((c) => c.text).join();
 
-  void _showError(String msg) {
-    if (!mounted) return;
-    final tc = ThemeColors.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.error_outline, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Expanded(child: Text(msg)),
-          ],
-        ),
-        backgroundColor: tc.error,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
   void _showSuccess(String msg) {
     if (!mounted) return;
     final tc = ThemeColors.of(context);
@@ -89,7 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final response = await http.post(
         Uri.parse(AppConfig.checkUserUrl),
         body: {'phone_number': _phoneController.text.trim()},
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(AppConfig.apiTimeout);
       if (!mounted) return;
       final data = json.decode(response.body);
       if (data['status'] == 'success') {
@@ -123,7 +104,7 @@ class _LoginScreenState extends State<LoginScreen> {
           'phone_number': _phoneController.text.trim(),
           'otp_code': _combinedOtp,
         },
-      );
+      ).timeout(AppConfig.apiTimeout);
       if (!mounted) return;
       final data = json.decode(response.body);
       if (data['status'] == 'success') {
@@ -212,7 +193,7 @@ class _LoginScreenState extends State<LoginScreen> {
               style: AppTypography.headlineMedium.copyWith(color: tc.neutral100)),
           const SizedBox(height: AppSpacing.sm),
           Text('Sign in to manage your health benefits',
-              style: AppTypography.bodyMedium.copyWith(color: tc.neutral60),
+              style: AppTypography.bodyMedium.copyWith(color: tc.textSecondary),
               textAlign: TextAlign.center),
           const SizedBox(height: AppSpacing.xxxl),
           _buildPhoneField(tc),
@@ -224,7 +205,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(width: 6),
                 Expanded(
                     child: Text(_error!,
-                        style: AppTypography.caption.copyWith(color: tc.error))),
+                        style: AppTypography.caption.copyWith(color: tc.errorText))),
               ],
             ),
           ],
@@ -252,9 +233,9 @@ class _LoginScreenState extends State<LoginScreen> {
           keyboardType: TextInputType.phone,
           onChanged: (_) => setState(() => _error = null),
           style: AppTypography.bodyLarge.copyWith(color: tc.neutral100),
-          decoration: InputDecoration(
+          decoration: const InputDecoration(
             hintText: '09XXXXXXXXX',
-            prefixIcon: const Icon(Icons.phone_android_rounded, size: 22),
+            prefixIcon: Icon(Icons.phone_android_rounded, size: 22),
           ),
         ),
       ],
@@ -284,16 +265,18 @@ class _LoginScreenState extends State<LoginScreen> {
               style: AppTypography.headlineMedium.copyWith(color: tc.neutral100)),
           const SizedBox(height: AppSpacing.sm),
           Text('We sent a 4-digit code to your device',
-              style: AppTypography.bodyMedium.copyWith(color: tc.neutral60),
+              style: AppTypography.bodyMedium.copyWith(color: tc.textSecondary),
               textAlign: TextAlign.center),
           const SizedBox(height: AppSpacing.xxxl),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(4, (i) {
               return Container(
-                width: 60,
-                height: 56,
-                margin: const EdgeInsets.symmetric(horizontal: 4),
+                // Width is capped so four boxes still fit a 320dp screen, but
+                // the height is left to the field: at large system font sizes a
+                // fixed 56dp box clipped the 22px digits.
+                constraints: const BoxConstraints(minWidth: 48, maxWidth: 60),
+                margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
                 child: TextField(
                   controller: _otpControllers[i],
                   focusNode: _otpFocusNodes[i],
@@ -334,7 +317,7 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 Icon(Icons.error_outline, size: 16, color: tc.error),
                 const SizedBox(width: 6),
-                Text(_error!, style: AppTypography.caption.copyWith(color: tc.error)),
+                Text(_error!, style: AppTypography.caption.copyWith(color: tc.errorText)),
               ],
             ),
           ],
@@ -354,7 +337,9 @@ class _LoginScreenState extends State<LoginScreen> {
     return TextButton.icon(
       onPressed: () => setState(() {
         _isOtpSent = false;
-        for (final c in _otpControllers) c.clear();
+        for (final c in _otpControllers) {
+          c.clear();
+        }
         _error = null;
       }),
       icon: const Icon(Icons.edit_outlined, size: 18),

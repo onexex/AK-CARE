@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../core/format.dart';
 import '../core/config.dart';
 import '../models/eprescription.dart';
 import '../design_system/app_colors.dart';
+import '../design_system/theme_colors.dart';
 import '../design_system/app_radius.dart';
 import '../design_system/app_spacing.dart';
 import '../design_system/app_typography.dart';
@@ -57,6 +59,9 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
   }
 
   void _showDetails(EPrescription prescription) {
+    // Resolved from this State's context so the whole sheet closure, including
+    // the card helpers, can colour itself for the active theme.
+    final tc = ThemeColors.of(context);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -78,11 +83,11 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2196F3).withOpacity(0.1),
+                    color: AppColors.featureNews.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: const Icon(Icons.medication_liquid_rounded,
-                      color: Color(0xFF2196F3), size: 28),
+                      color: AppColors.featureNews, size: 28),
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
@@ -91,10 +96,10 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
                     children: [
                       Text('Prescription',
                           style: AppTypography.titleLarge
-                              .copyWith(color: AppColors.neutral100)),
-                      Text(_formatDate(prescription.createdAt),
+                              .copyWith(color: tc.neutral100)),
+                      Text(formatRelativeDate(prescription.createdAt),
                           style: AppTypography.caption
-                              .copyWith(color: AppColors.neutral60)),
+                              .copyWith(color: tc.textSecondary)),
                     ],
                   ),
                 ),
@@ -103,28 +108,28 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
             const SizedBox(height: AppSpacing.xxl),
 
             // Info cards
-            _infoCard('Doctor', prescription.doctorName.isNotEmpty
+            _infoCard(tc, 'Doctor', prescription.doctorName.isNotEmpty
                 ? prescription.doctorName
                 : 'Not specified'),
-            _infoCard('Diagnosis', prescription.diagnosis.isNotEmpty
+            _infoCard(tc, 'Diagnosis', prescription.diagnosis.isNotEmpty
                 ? prescription.diagnosis
                 : 'Not specified'),
             if (prescription.notes.isNotEmpty)
-              _infoCard('Notes', prescription.notes),
+              _infoCard(tc, 'Notes', prescription.notes),
 
             const SizedBox(height: AppSpacing.lg),
 
             // Medicines list
             Text('Medicines (${prescription.items.length})',
                 style: AppTypography.titleMedium
-                    .copyWith(color: AppColors.neutral100)),
+                    .copyWith(color: tc.neutral100)),
             const SizedBox(height: AppSpacing.md),
 
             if (prescription.items.isEmpty)
-              const Text('No medicines listed.',
-                  style: TextStyle(color: AppColors.neutral60))
+              Text('No medicines listed.',
+                  style: AppTypography.bodyMedium.copyWith(color: tc.textSecondary))
             else
-              ...prescription.items.map((item) => _medicineCard(item)),
+              ...prescription.items.map((item) => _medicineCard(tc, item)),
 
             const SizedBox(height: AppSpacing.xxl),
           ],
@@ -133,12 +138,12 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
     );
   }
 
-  Widget _infoCard(String label, String value) {
+  Widget _infoCard(ThemeColors tc, String label, String value) {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: tc.surface,
         borderRadius: BorderRadius.circular(AppRadius.md),
         boxShadow: AppElevation.subtle,
       ),
@@ -149,28 +154,28 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
             width: 80,
             child: Text(label,
                 style: AppTypography.labelMedium
-                    .copyWith(color: AppColors.neutral60)),
+                    .copyWith(color: tc.textSecondary)),
           ),
           Expanded(
             child: Text(value,
                 style: AppTypography.bodyMedium
-                    .copyWith(color: AppColors.neutral90)),
+                    .copyWith(color: tc.neutral90)),
           ),
         ],
       ),
     );
   }
 
-  Widget _medicineCard(EPrescriptionItem item) {
+  Widget _medicineCard(ThemeColors tc, EPrescriptionItem item) {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: tc.surface,
         borderRadius: BorderRadius.circular(AppRadius.md),
         boxShadow: AppElevation.subtle,
         border: const Border(
-          left: BorderSide(color: Color(0xFF2196F3), width: 3),
+          left: BorderSide(color: AppColors.featureNews, width: 3),
         ),
       ),
       child: Column(
@@ -178,35 +183,35 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
         children: [
           Text(item.medicineName,
               style: AppTypography.titleMedium
-                  .copyWith(color: AppColors.neutral100)),
+                  .copyWith(color: tc.neutral100)),
           const SizedBox(height: AppSpacing.sm),
-          _medRow('Dosage', item.dosage),
-          _medRow('Frequency', item.frequency),
-          _medRow('Duration', item.duration),
-          _medRow('Quantity', item.quantity),
+          _medRow(tc, 'Dosage', item.dosage),
+          _medRow(tc, 'Frequency', item.frequency),
+          _medRow(tc, 'Duration', item.duration),
+          _medRow(tc, 'Quantity', item.quantity),
           if (item.notes.isNotEmpty)
-            _medRow('Notes', item.notes),
+            _medRow(tc, 'Notes', item.notes),
         ],
       ),
     );
   }
 
-  Widget _medRow(String label, String value) {
+  Widget _medRow(ThemeColors tc, String label, String value) {
     if (value.isEmpty) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.only(top: AppSpacing.xs),
       child: Row(
         children: [
           SizedBox(
             width: 80,
             child: Text(label,
                 style: AppTypography.caption
-                    .copyWith(color: AppColors.neutral60)),
+                    .copyWith(color: tc.textSecondary)),
           ),
           Expanded(
             child: Text(value,
                 style: AppTypography.bodySmall
-                    .copyWith(color: AppColors.neutral80)),
+                    .copyWith(color: tc.neutral80)),
           ),
         ],
       ),
@@ -215,8 +220,9 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
     return Scaffold(
-      backgroundColor: AppColors.scaffoldBg,
+      backgroundColor: tc.scaffoldBg,
       appBar: AppBar(title: const Text('E-Prescriptions')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -238,7 +244,7 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
                     return Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.md),
                       child: Material(
-                        color: AppColors.surface,
+                        color: tc.surface,
                         borderRadius: BorderRadius.circular(AppRadius.lg),
                         child: InkWell(
                           onTap: () => _showDetails(p),
@@ -255,14 +261,14 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(AppSpacing.md),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF2196F3)
+                                    color: AppColors.featureNews
                                         .withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(
                                         AppRadius.md),
                                   ),
                                   child: const Icon(
                                       Icons.medication_liquid_rounded,
-                                      color: Color(0xFF2196F3),
+                                      color: AppColors.featureNews,
                                       size: 24),
                                 ),
                                 const SizedBox(width: AppSpacing.md),
@@ -278,17 +284,17 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
                                           style: AppTypography.titleMedium
                                               .copyWith(
                                                   color:
-                                                      AppColors.neutral100)),
+                                                      tc.neutral100)),
                                       const SizedBox(height: 4),
                                       Text(
-                                          '${p.itemsCount} medicine(s) · ${_formatDate(p.createdAt)}',
+                                          '${p.itemsCount} medicine(s) · ${formatRelativeDate(p.createdAt)}',
                                           style: AppTypography.caption.copyWith(
-                                              color: AppColors.neutral60)),
+                                              color: tc.textSecondary)),
                                     ],
                                   ),
                                 ),
-                                const Icon(Icons.chevron_right,
-                                    color: AppColors.neutral50, size: 20),
+                                Icon(Icons.chevron_right,
+                                    color: tc.neutral50, size: 20),
                               ],
                             ),
                           ),
@@ -300,12 +306,4 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
     );
   }
 
-  String _formatDate(String iso) {
-    try {
-      final dt = DateTime.parse(iso);
-      return '${dt.month}/${dt.day}/${dt.year}';
-    } catch (_) {
-      return iso;
-    }
-  }
 }

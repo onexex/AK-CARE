@@ -138,7 +138,7 @@ class _CommunityCreatePostScreenState extends State<CommunityCreatePostScreen> {
               decoration: InputDecoration(
                 hintText: "What's on your mind?",
                 border: InputBorder.none,
-                hintStyle: AppTypography.bodyLarge.copyWith(color: tc.neutral60),
+                hintStyle: AppTypography.bodyLarge.copyWith(color: tc.textSecondary),
               ),
               style: AppTypography.bodyLarge
                   .copyWith(color: tc.neutral100),
@@ -164,19 +164,30 @@ class _CommunityCreatePostScreenState extends State<CommunityCreatePostScreen> {
                         ),
                       ),
                       Positioned(
-                        right: 2,
-                        top: 2,
+                        right: 0,
+                        top: 0,
+                        // The visible chip stays small, but the tappable area
+                        // is 44x44 — it was 18x18, and it discards an image.
                         child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
                           onTap: () => setState(
                               () => _selectedImages.remove(img)),
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(
-                              color: AppColors.error,
-                              shape: BoxShape.circle,
+                          child: SizedBox(
+                            width: 44,
+                            height: 44,
+                            child: Align(
+                              alignment: Alignment.topRight,
+                              child: Container(
+                                margin: const EdgeInsets.all(2),
+                                padding: const EdgeInsets.all(AppSpacing.xs),
+                                decoration: const BoxDecoration(
+                                  color: AppColors.error,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.close,
+                                    size: 14, color: Colors.white),
+                              ),
                             ),
-                            child: const Icon(Icons.close,
-                                size: 14, color: Colors.white),
                           ),
                         ),
                       ),
@@ -195,7 +206,7 @@ class _CommunityCreatePostScreenState extends State<CommunityCreatePostScreen> {
                   Icon(Icons.add_photo_alternate_outlined, size: 20, color: tc.primary),
               label: Text(
                   _selectedImages.isEmpty ? 'Add Images' : 'Add More',
-                  style: AppTypography.labelLarge.copyWith(color: tc.primary)),
+                  style: AppTypography.labelLarge.copyWith(color: tc.primaryText)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: tc.primary,
                 side:

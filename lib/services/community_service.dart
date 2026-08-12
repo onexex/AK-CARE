@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../core/config.dart';
-import '../models/community_post.dart';
 
 class CommunityService {
   static const String _communityPath = 'community';

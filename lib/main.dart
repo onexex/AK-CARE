@@ -4,7 +4,6 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'dart:convert';
 import 'design_system/app_theme.dart';
 import 'design_system/app_colors.dart';
-import 'design_system/app_typography.dart';
 import 'core/theme_controller.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_dashboard.dart';

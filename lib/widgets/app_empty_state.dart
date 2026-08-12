@@ -30,7 +30,7 @@ class AppEmptyState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(AppSpacing.xl),
               decoration: BoxDecoration(
                 color: tc.neutral20,
                 borderRadius: BorderRadius.circular(AppSpacing.xxl),
@@ -45,7 +45,7 @@ class AppEmptyState extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             Text(subtitle,
                 style: AppTypography.bodyMedium
-                    .copyWith(color: tc.neutral60),
+                    .copyWith(color: tc.textSecondary),
                 textAlign: TextAlign.center),
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: AppSpacing.xxl),

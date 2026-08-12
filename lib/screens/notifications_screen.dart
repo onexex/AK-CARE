@@ -4,6 +4,7 @@ import 'dart:convert';
 import '../services/community_service.dart';
 import '../models/community_post.dart';
 import '../design_system/app_colors.dart';
+import '../design_system/theme_colors.dart';
 import '../design_system/app_spacing.dart';
 import '../design_system/app_typography.dart';
 import '../widgets/app_empty_state.dart';
@@ -57,12 +58,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     };
   }
 
-  Color _colorForType(String type) {
+  Color _colorForType(ThemeColors tc, String type) {
     return switch (type) {
-      'like' => AppColors.primary,
-      'comment' => const Color(0xFF2196F3),
-      'reply' => const Color(0xFFFF9800),
-      _ => AppColors.neutral60,
+      'like' => tc.primary,
+      'comment' => AppColors.featureNews,
+      'reply' => AppColors.featureCertificate,
+      _ => tc.neutral60,
     };
   }
 
@@ -77,8 +78,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
     return Scaffold(
-      backgroundColor: AppColors.scaffoldBg,
+      backgroundColor: tc.scaffoldBg,
       appBar: AppBar(
         title: const Text('Notifications'),
         actions: [
@@ -114,8 +116,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         padding: const EdgeInsets.all(AppSpacing.md),
                         decoration: BoxDecoration(
                           color: n.isRead
-                              ? AppColors.surface
-                              : AppColors.primarySurface,
+                              ? tc.surface
+                              : tc.primarySurface,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -123,11 +125,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: _colorForType(n.type).withOpacity(0.1),
+                                color: _colorForType(tc, n.type).withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Icon(_iconForType(n.type),
-                                  color: _colorForType(n.type), size: 22),
+                                  color: _colorForType(tc, n.type), size: 22),
                             ),
                             const SizedBox(width: AppSpacing.md),
                             Expanded(
@@ -137,13 +139,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                   RichText(
                                     text: TextSpan(
                                       style: AppTypography.bodyMedium.copyWith(
-                                          color: AppColors.neutral100),
+                                          color: tc.neutral100),
                                       children: [
                                         TextSpan(
                                           text: n.fromUser.fullName,
                                           style: AppTypography.labelLarge
                                               .copyWith(
-                                                  color: AppColors.neutral100),
+                                                  color: tc.neutral100),
                                         ),
                                         TextSpan(
                                             text: ' ${_textForType(n.type)}'),
@@ -154,7 +156,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                     const SizedBox(height: 4),
                                     Text(n.postPreview,
                                         style: AppTypography.caption.copyWith(
-                                            color: AppColors.neutral60),
+                                            color: tc.textSecondary),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis),
                                   ],

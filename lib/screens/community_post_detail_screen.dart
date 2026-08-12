@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/format.dart';
 import '../models/community_post.dart';
 import '../services/community_service.dart';
 import '../design_system/app_colors.dart';
@@ -6,7 +7,6 @@ import '../design_system/theme_colors.dart';
 import '../design_system/app_radius.dart';
 import '../design_system/app_spacing.dart';
 import '../design_system/app_typography.dart';
-import '../design_system/app_elevation.dart';
 
 class CommunityPostDetailScreen extends StatefulWidget {
   final CommunityPost post;
@@ -153,15 +153,15 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
                 if (_isLoadingComments)
                   const Center(
                       child: Padding(
-                    padding: EdgeInsets.all(32),
+                    padding: EdgeInsets.all(AppSpacing.xxxl),
                     child: CircularProgressIndicator(),
                   ))
                 else if (_comments.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.all(32),
+                    padding: const EdgeInsets.all(AppSpacing.xxxl),
                     child: Center(
                         child: Text('No comments yet.',
-                            style: TextStyle(color: tc.neutral60))),
+                            style: AppTypography.bodyMedium.copyWith(color: tc.textSecondary))),
                   )
                 else
                   ..._comments.map((c) => _buildCommentTile(c, tc)),
@@ -180,7 +180,7 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
                     controller: _commentController,
                     decoration: InputDecoration(
                       hintText: 'Write a comment...',
-                      hintStyle: AppTypography.bodyMedium.copyWith(color: tc.neutral60),
+                      hintStyle: AppTypography.bodyMedium.copyWith(color: tc.textSecondary),
                       filled: true,
                       fillColor: tc.neutral10,
                       contentPadding: const EdgeInsets.symmetric(
@@ -232,7 +232,7 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
                             : '?')
                         .toUpperCase(),
                     style: AppTypography.labelLarge
-                        .copyWith(color: tc.primary),
+                        .copyWith(color: tc.primaryText),
                   ),
                 ),
               ),
@@ -244,9 +244,9 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
                     Text(_post.user.fullName,
                         style: AppTypography.titleMedium
                             .copyWith(color: tc.neutral100)),
-                    Text(_formatDate(_post.createdAt),
+                    Text(formatRelativeDate(_post.createdAt),
                         style: AppTypography.caption
-                            .copyWith(color: tc.neutral60)),
+                            .copyWith(color: tc.textSecondary)),
                   ],
                 ),
               ),
@@ -288,7 +288,7 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
                             : '?')
                         .toUpperCase(),
                     style: AppTypography.labelSmall
-                        .copyWith(color: tc.primary),
+                        .copyWith(color: tc.primaryText),
                   ),
                 ),
               ),
@@ -318,31 +318,36 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
           ),
           // Actions
           Padding(
-            padding: const EdgeInsets.only(left: 40),
+            padding: const EdgeInsets.only(left: AppSpacing.huge),
             child: Row(
               children: [
                 TextButton(
                   onPressed: () => setState(
                       () => _replyingToCommentId = comment.id),
                   style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sm),
+                      minimumSize: const Size(48, 48),
+                      tapTargetSize: MaterialTapTargetSize.padded),
                   child: Text('Reply',
                       style: AppTypography.caption
-                          .copyWith(color: tc.neutral60)),
+                          .copyWith(color: tc.textSecondary)),
                 ),
                 if (comment.userId.toString() == widget.currentUserId) ...[
                   const SizedBox(width: AppSpacing.md),
                   TextButton(
                     onPressed: () => _deleteComment(comment.id),
                     style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm),
+                        // 48x48 is the documented minimum touch target. These
+                        // previously collapsed to about 30x15 — and one of them
+                        // deletes a comment.
+                        minimumSize: const Size(48, 48),
+                        tapTargetSize: MaterialTapTargetSize.padded),
                     child: Text('Delete',
                         style: AppTypography.caption
-                            .copyWith(color: tc.error)),
+                            .copyWith(color: tc.errorText)),
                   ),
                 ],
               ],
@@ -370,7 +375,7 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
                       autofocus: true,
                       decoration: InputDecoration(
                         hintText: 'Write a reply...',
-                        hintStyle: AppTypography.bodySmall.copyWith(color: tc.neutral60),
+                        hintStyle: AppTypography.bodySmall.copyWith(color: tc.textSecondary),
                         filled: true,
                         fillColor: tc.neutral10,
                         contentPadding: const EdgeInsets.symmetric(
@@ -452,17 +457,4 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
     );
   }
 
-  String _formatDate(String iso) {
-    try {
-      final dt = DateTime.parse(iso);
-      final now = DateTime.now();
-      final diff = now.difference(dt);
-      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-      if (diff.inHours < 24) return '${diff.inHours}h ago';
-      if (diff.inDays < 7) return '${diff.inDays}d ago';
-      return '${dt.month}/${dt.day}/${dt.year}';
-    } catch (_) {
-      return iso;
-    }
-  }
 }

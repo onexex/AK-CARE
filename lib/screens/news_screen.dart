@@ -68,10 +68,12 @@ class _NewsScreenState extends State<NewsScreen> {
       body: Column(children: [
         Padding(padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.sm),
           child: TextField(controller: _searchController, onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()), decoration: InputDecoration(hintText: 'Search news...', prefixIcon: const Icon(Icons.search_rounded, size: 22), suffixIcon: _searchQuery.isNotEmpty ? IconButton(icon: const Icon(Icons.clear_rounded, size: 20), onPressed: () { _searchController.clear(); setState(() => _searchQuery = ''); }) : null, filled: true, fillColor: tc.surface, border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.md), borderSide: BorderSide.none)))),
-        SizedBox(height: 44, child: ListView.builder(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md), itemCount: _categories.length, itemBuilder: (context, i) {
+        // Intrinsic height so the chips grow with the system font size rather
+        // than clipping inside a fixed 44dp box.
+        SingleChildScrollView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md), child: Row(children: List.generate(_categories.length, (i) {
           final sel = _selectedCategory == _categories[i];
-          return Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: FilterChip(label: Text(_categories[i]), selected: sel, onSelected: (_) => setState(() => _selectedCategory = _categories[i]), backgroundColor: tc.surface, selectedColor: tc.primarySurface, checkmarkColor: tc.primary, labelStyle: AppTypography.labelMedium.copyWith(color: sel ? tc.primary : tc.neutral70), side: BorderSide.none, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.full))));
-        })),
+          return Padding(padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs), child: FilterChip(label: Text(_categories[i]), selected: sel, onSelected: (_) => setState(() => _selectedCategory = _categories[i]), backgroundColor: tc.surface, selectedColor: tc.primarySurface, checkmarkColor: tc.primary, labelStyle: AppTypography.labelMedium.copyWith(color: sel ? tc.primaryText : tc.textSecondary), side: BorderSide.none, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.full))));
+        }))),
         const SizedBox(height: AppSpacing.sm),
         Expanded(child: FutureBuilder<List<NewsArticle>>(future: _newsFuture, builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
@@ -82,7 +84,7 @@ class _NewsScreenState extends State<NewsScreen> {
             return Padding(padding: const EdgeInsets.only(bottom: AppSpacing.md), child: Material(color: tc.surface, borderRadius: BorderRadius.circular(AppRadius.lg), child: InkWell(onTap: () => _showDetails(news), borderRadius: BorderRadius.circular(AppRadius.lg), child: Container(padding: const EdgeInsets.all(AppSpacing.md), decoration: BoxDecoration(borderRadius: BorderRadius.circular(AppRadius.lg), boxShadow: AppElevation.subtle), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               ClipRRect(borderRadius: BorderRadius.circular(AppRadius.md), child: news.imageUrl.isNotEmpty ? Image.network(news.imageUrl, width: 80, height: 80, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _placeholder(tc)) : _placeholder(tc)),
               const SizedBox(width: AppSpacing.md),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(news.title, style: AppTypography.titleMedium.copyWith(color: tc.neutral100), maxLines: 2, overflow: TextOverflow.ellipsis), const SizedBox(height: AppSpacing.xs), Text('$date \u00b7 ${news.category}', style: AppTypography.caption.copyWith(color: tc.neutral60)), const SizedBox(height: AppSpacing.sm), Text(news.content, style: AppTypography.bodySmall.copyWith(color: tc.neutral70), maxLines: 2, overflow: TextOverflow.ellipsis)])),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(news.title, style: AppTypography.titleMedium.copyWith(color: tc.neutral100), maxLines: 2, overflow: TextOverflow.ellipsis), const SizedBox(height: AppSpacing.xs), Text('$date \u00b7 ${news.category}', style: AppTypography.caption.copyWith(color: tc.textSecondary)), const SizedBox(height: AppSpacing.sm), Text(news.content, style: AppTypography.bodySmall.copyWith(color: tc.neutral70), maxLines: 2, overflow: TextOverflow.ellipsis)])),
 Icon(Icons.chevron_right, color: tc.neutral50, size: 20),
             ])))));
           }));

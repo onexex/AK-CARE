@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../core/config.dart';
 import '../design_system/app_colors.dart';
+import '../design_system/theme_colors.dart';
 import '../design_system/app_radius.dart';
 import '../design_system/app_spacing.dart';
 import '../design_system/app_typography.dart';
@@ -62,6 +63,7 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
       showDragHandle: true,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) {
+          final tc = ThemeColors.of(context);
           return Padding(
             padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.xxl,
@@ -72,14 +74,14 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Request Medical Certificate',
-                      style: AppTypography.headlineMedium.copyWith(color: AppColors.neutral100)),
+                      style: AppTypography.headlineMedium.copyWith(color: tc.neutral100)),
                   const SizedBox(height: AppSpacing.xxl),
-                  Text('Reason', style: AppTypography.labelMedium.copyWith(color: AppColors.neutral80)),
+                  Text('Reason', style: AppTypography.labelMedium.copyWith(color: tc.neutral80)),
                   const SizedBox(height: AppSpacing.sm),
                   TextField(
                     controller: reasonCtrl, maxLines: 3,
                     enabled: !isSaving,
-                    decoration: InputDecoration(hintText: 'e.g. Employment, School, Travel...'),
+                    decoration: const InputDecoration(hintText: 'e.g. Employment, School, Travel...'),
                   ),
                   const SizedBox(height: AppSpacing.xxl),
                   AppButton(
@@ -88,6 +90,12 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
                     onPressed: isSaving ? null : () async {
                       if (reasonCtrl.text.trim().isEmpty) return;
                       setModalState(() => isSaving = true);
+
+                      // Resolved before the async gap; the sheet's context is
+                      // defunct once it has been popped.
+                      final messenger = ScaffoldMessenger.of(context);
+                      final navigator = Navigator.of(ctx);
+
                       try {
                         final prefs = await SharedPreferences.getInstance();
                         final json = prefs.getString('user_session');
@@ -97,17 +105,15 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
                           body: {'user_id': user['id'].toString(), 'reason': reasonCtrl.text.trim()},
                         ).timeout(AppConfig.apiTimeout);
                         final result = jsonDecode(res.body);
-                        Navigator.pop(ctx);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text(result['message'] ?? 'Request submitted'),
-                            backgroundColor: result['status'] == 'success' ? AppColors.success : AppColors.error,
-                            behavior: SnackBarBehavior.floating,
-                          ));
-                          _loadRequests();
-                        }
+                        navigator.pop();
+                        messenger.showSnackBar(SnackBar(
+                          content: Text(result['message'] ?? 'Request submitted'),
+                          backgroundColor: result['status'] == 'success' ? tc.success : tc.error,
+                          behavior: SnackBarBehavior.floating,
+                        ));
+                        if (mounted) _loadRequests();
                       } catch (_) {
-                        setModalState(() => isSaving = false);
+                        if (ctx.mounted) setModalState(() => isSaving = false);
                       }
                     },
                   ),
@@ -120,23 +126,24 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
     );
   }
 
-  Color _statusColor(String status) {
-    return switch (status?.toLowerCase()) {
-      'approved' => AppColors.success,
-      'pending' => const Color(0xFFFF9800),
-      'rejected' => AppColors.error,
-      _ => AppColors.neutral60,
+  Color _statusColor(ThemeColors tc, String status) {
+    return switch (status.toLowerCase()) {
+      'approved' => tc.success,
+      'pending' => AppColors.featureCertificate,
+      'rejected' => tc.error,
+      _ => tc.neutral60,
     };
   }
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
     return Scaffold(
-      backgroundColor: AppColors.scaffoldBg,
+      backgroundColor: tc.scaffoldBg,
       appBar: AppBar(title: const Text('Medical Certificates')),
       floatingActionButton: FloatingActionButton(
         onPressed: _showRequestForm,
-        backgroundColor: AppColors.primary,
+        backgroundColor: tc.primary,
         child: const Icon(Icons.add, color: Colors.white),
       ),
       body: _isLoading
@@ -156,27 +163,27 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
                       return Container(
                         margin: const EdgeInsets.only(bottom: AppSpacing.md),
                         padding: const EdgeInsets.all(AppSpacing.lg),
-                        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(AppRadius.lg), boxShadow: AppElevation.subtle),
+                        decoration: BoxDecoration(color: tc.surface, borderRadius: BorderRadius.circular(AppRadius.lg), boxShadow: AppElevation.subtle),
                         child: Row(
                           children: [
                             Container(
                               padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(color: const Color(0xFFFF9800).withOpacity(0.1), borderRadius: BorderRadius.circular(AppRadius.md)),
-                              child: const Icon(Icons.verified_user_rounded, color: Color(0xFFFF9800), size: 24),
+                              decoration: BoxDecoration(color: AppColors.featureCertificate.withOpacity(0.1), borderRadius: BorderRadius.circular(AppRadius.md)),
+                              child: const Icon(Icons.verified_user_rounded, color: AppColors.featureCertificate, size: 24),
                             ),
                             const SizedBox(width: AppSpacing.md),
                             Expanded(
                               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text(r['reason'] ?? '', style: AppTypography.titleMedium.copyWith(color: AppColors.neutral100), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                Text(r['reason'] ?? '', style: AppTypography.titleMedium.copyWith(color: tc.neutral100), maxLines: 1, overflow: TextOverflow.ellipsis),
                                 const SizedBox(height: 4),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(color: _statusColor(r['status']).withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
-                                  child: Text((r['status'] ?? 'pending').toUpperCase(), style: AppTypography.labelSmall.copyWith(color: _statusColor(r['status']))),
+                                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 2),
+                                  decoration: BoxDecoration(color: _statusColor(tc, r['status']).withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
+                                  child: Text((r['status'] ?? 'pending').toUpperCase(), style: AppTypography.labelSmall.copyWith(color: _statusColor(tc, r['status']))),
                                 ),
                               ]),
                             ),
-                            const Icon(Icons.chevron_right, color: AppColors.neutral50, size: 20),
+                            Icon(Icons.chevron_right, color: tc.neutral50, size: 20),
                           ],
                         ),
                       );

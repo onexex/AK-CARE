@@ -11,6 +11,7 @@ import '../design_system/app_typography.dart';
 import '../design_system/app_elevation.dart';
 import '../widgets/app_button.dart';
 import '../widgets/app_section_header.dart';
+import '../widgets/app_feature_tile.dart';
 import 'request_status_screen.dart';
 import 'eprescription_screen.dart';
 import 'pharmacy_discounts_screen.dart';
@@ -43,6 +44,11 @@ class _PerksScreenState extends State<PerksScreen> {
     final reasonCtrl = TextEditingController();
     final dateCtrl = TextEditingController();
 
+    // Declared out here, alongside the controllers, so it survives rebuilds.
+    // Inside StatefulBuilder's builder it was reset to false on every
+    // setModalState, so the submit button never actually disabled.
+    bool loading = false;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -50,8 +56,7 @@ class _PerksScreenState extends State<PerksScreen> {
       showDragHandle: true,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) {
-          bool loading = false;
-
+          final tc = ThemeColors.of(context);
           return Padding(
             padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.xxl,
@@ -65,15 +70,15 @@ class _PerksScreenState extends State<PerksScreen> {
                 children: [
                   Text('Request Teleconsult',
                       style: AppTypography.headlineMedium.copyWith(
-                          color: AppColors.neutral100)),
+                          color: tc.neutral100)),
                   const SizedBox(height: AppSpacing.xs),
                   Text('Tell us your concern and preferred schedule.',
                       style: AppTypography.bodyMedium.copyWith(
-                          color: AppColors.neutral60)),
+                          color: tc.textSecondary)),
                   const SizedBox(height: AppSpacing.xxl),
                   Text('Reason for Consultation',
                       style: AppTypography.labelMedium.copyWith(
-                          color: AppColors.neutral80)),
+                          color: tc.neutral80)),
                   const SizedBox(height: AppSpacing.sm),
                   TextField(
                     controller: reasonCtrl,
@@ -85,7 +90,7 @@ class _PerksScreenState extends State<PerksScreen> {
                   const SizedBox(height: AppSpacing.lg),
                   Text('Preferred Date',
                       style: AppTypography.labelMedium.copyWith(
-                          color: AppColors.neutral80)),
+                          color: tc.neutral80)),
                   const SizedBox(height: AppSpacing.sm),
                   TextField(
                     controller: dateCtrl,
@@ -123,6 +128,13 @@ class _PerksScreenState extends State<PerksScreen> {
                         return;
                       }
                       setModalState(() => loading = true);
+
+                      // Resolved before the async gap. Once the sheet is popped
+                      // its context is defunct, so these cannot be read from it
+                      // afterwards.
+                      final messenger = ScaffoldMessenger.of(context);
+                      final navigator = Navigator.of(ctx);
+
                       try {
                         final prefs = await SharedPreferences.getInstance();
                         final json = prefs.getString('user_session');
@@ -139,8 +151,8 @@ class _PerksScreenState extends State<PerksScreen> {
                           ).timeout(const Duration(seconds: 10));
                           final result = jsonDecode(response.body);
                           if (result['status'] == 'success') {
-                            Navigator.pop(ctx);
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            navigator.pop();
+                            messenger.showSnackBar(
                               const SnackBar(
                                   content: Text('Request submitted! We will contact you soon.'),
                                   backgroundColor: Colors.green,
@@ -151,8 +163,8 @@ class _PerksScreenState extends State<PerksScreen> {
                           }
                         }
                       } catch (e) {
-                        setModalState(() => loading = false);
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        if (ctx.mounted) setModalState(() => loading = false);
+                        messenger.showSnackBar(
                           SnackBar(
                               content: Text('Error: $e'),
                               backgroundColor: Colors.red,
@@ -181,9 +193,9 @@ class _PerksScreenState extends State<PerksScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildFeaturedPerk(),
-            const SizedBox(height: AppSpacing.xxl),
-            AppSectionHeader(title: 'Other Benefits'),
+            _buildFeaturedPerk(tc),
+            const SizedBox(height: AppSpacing.lg),
+            const AppSectionHeader(title: 'Other Benefits'),
             const SizedBox(height: AppSpacing.sm),
             LayoutBuilder(
               builder: (context, constraints) {
@@ -194,45 +206,48 @@ class _PerksScreenState extends State<PerksScreen> {
                   crossAxisCount: cols,
                   crossAxisSpacing: AppSpacing.md,
                   mainAxisSpacing: AppSpacing.md,
-                  childAspectRatio: 1.1,
+                  // 1.2 matches the dashboard exactly — same tile, same shape —
+                  // and is still above the ~130dp the tile's content needs.
+                  childAspectRatio: 1.2,
                   children: [
-                    _perkCard(
-                        'E-Prescription',
-                        Icons.medication_liquid_rounded,
-                        const Color(0xFF2196F3),
-                        'View history',
-                        () => Navigator.push(context, MaterialPageRoute(
-                            builder: (_) => const EPrescriptionScreen())),
-                        tc),
-                    _perkCard(
-                        'Pharmacy Disc.',
-                        Icons.local_pharmacy_rounded,
-                        const Color(0xFFE91E63),
-                        'Up to 10% off',
-                        () => Navigator.push(context, MaterialPageRoute(
-                            builder: (_) => const PharmacyDiscountsScreen())),
-                        tc),
-                    _perkCard(
-                        'Consult Requests',
-                        Icons.pending_actions_rounded,
-                        const Color(0xFF673AB7),
-                        'Track status',
-                        () => Navigator.push(context, MaterialPageRoute(
-                            builder: (_) => const RequestStatusScreen())),
-                        tc),
-                    _perkCard(
-                        'Med Certificate',
-                        Icons.verified_user_rounded,
-                        const Color(0xFFFF9800),
-                        'Fast request',
-                        () => Navigator.push(context, MaterialPageRoute(
-                            builder: (_) => const MedicalCertsScreen())),
-                        tc),
+                    AppFeatureTile(
+                        title: 'E-Prescription',
+                        subtitle: 'View history',
+                        icon: Icons.medication_liquid_rounded,
+                        color: AppColors.featureNews,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(
+                            builder: (_) => const EPrescriptionScreen()))),
+                    AppFeatureTile(
+                        // 'Pharmacy Discounts' ellipsises to 'Pharmacy Disco…'
+                        // at this tile width, and 'Pharmacy Disc.' is an
+                        // abbreviation nobody says out loud. The subtitle
+                        // already carries the discount, so the title doesn't
+                        // have to.
+                        title: 'Pharmacy',
+                        subtitle: 'Up to 10% off',
+                        icon: Icons.local_pharmacy_rounded,
+                        color: AppColors.featurePharmacy,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(
+                            builder: (_) => const PharmacyDiscountsScreen()))),
+                    AppFeatureTile(
+                        title: 'Consult Requests',
+                        subtitle: 'Track status',
+                        icon: Icons.pending_actions_rounded,
+                        color: AppColors.featureEPrescription,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(
+                            builder: (_) => const RequestStatusScreen()))),
+                    AppFeatureTile(
+                        title: 'Med Certificate',
+                        subtitle: 'Fast request',
+                        icon: Icons.verified_user_rounded,
+                        color: AppColors.featureCertificate,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(
+                            builder: (_) => const MedicalCertsScreen()))),
                   ],
                 );
               },
             ),
-            const SizedBox(height: AppSpacing.xxl),
+            const SizedBox(height: AppSpacing.lg),
             Material(
               color: Colors.transparent,
               child: InkWell(
@@ -244,17 +259,17 @@ class _PerksScreenState extends State<PerksScreen> {
                     color: tc.deepTealLight,
                     borderRadius: BorderRadius.circular(AppRadius.lg),
                     border: Border.all(
-                        color: AppColors.deepTeal.withOpacity(0.2)),
+                        color: tc.deepTeal.withOpacity(0.2)),
                   ),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(AppSpacing.md),
                         decoration: BoxDecoration(
-                            color: AppColors.deepTeal.withOpacity(0.1),
+                            color: tc.deepTeal.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(AppRadius.md)),
-                        child: const Icon(Icons.support_agent_rounded,
-                            color: AppColors.deepTeal, size: 28),
+                        child: Icon(Icons.support_agent_rounded,
+                            color: tc.deepTeal, size: 28),
                       ),
                       const SizedBox(width: AppSpacing.lg),
                       Expanded(
@@ -263,16 +278,18 @@ class _PerksScreenState extends State<PerksScreen> {
                           children: [
                             Text('AnaKalusugan Hotline',
                                 style: AppTypography.titleMedium
-                                    .copyWith(color: AppColors.deepTeal)),
+                                    .copyWith(color: tc.deepTeal)),
                             const SizedBox(height: 2),
+                            // Full strength, not 70%: faded it sat at 3.88:1
+                            // against the tinted card, under the 4.5 needed.
                             Text('Tap to call: 0935 242 7713',
-                                style: AppTypography.bodySmall.copyWith(
-                                    color: AppColors.deepTeal.withOpacity(0.7))),
+                                style: AppTypography.bodySmall
+                                    .copyWith(color: tc.deepTeal)),
                           ],
                         ),
                       ),
-                      const Icon(Icons.call_rounded,
-                          color: AppColors.deepTeal, size: 24),
+                      Icon(Icons.call_rounded,
+                          color: tc.deepTeal, size: 24),
                     ],
                   ),
                 ),
@@ -285,11 +302,19 @@ class _PerksScreenState extends State<PerksScreen> {
     );
   }
 
-  Widget _buildFeaturedPerk() {
+  Widget _buildFeaturedPerk(ThemeColors tc) {
+    // Trimmed from ~244dp to ~192dp. At its old size this card plus the grid
+    // pushed the hotline 74dp below the fold, so the one thing a member wants
+    // when something has gone wrong was the one thing they had to hunt for.
+    // The button keeps its 16dp vertical padding — anything less drops it under
+    // the 48dp touch target.
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.xxl),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
+        // Fixed brand greens, not theme-aware ones: in dark mode cs.primary IS
+        // primaryLight, so tc.primary and tc.primaryLight resolved to the same
+        // value and the gradient flattened to a single flat green.
         gradient: const LinearGradient(
             colors: [AppColors.primary, AppColors.primaryLight],
             begin: Alignment.topLeft,
@@ -301,28 +326,33 @@ class _PerksScreenState extends State<PerksScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(AppSpacing.md),
+            padding: const EdgeInsets.all(AppSpacing.sm),
             decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(AppRadius.md)),
             child: const Icon(Icons.medical_services_rounded,
-                color: Colors.white, size: 28),
+                color: Colors.white, size: 24),
           ),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.sm),
           Text('AnaKalusugan Teleconsult',
               style: AppTypography.headlineMedium.copyWith(color: Colors.white)),
           const SizedBox(height: AppSpacing.xs),
           Text('Talk to a doctor, for FREE.',
               style: AppTypography.bodyMedium.copyWith(
                   color: Colors.white.withOpacity(0.8))),
-          const SizedBox(height: AppSpacing.xxl),
+          const SizedBox(height: AppSpacing.sm),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: _showScheduleForm,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
-                foregroundColor: AppColors.primary,
+                // This button sits on white in BOTH themes, so its label must
+                // not be theme-aware: tc.primaryText returns the lighter green
+                // in dark mode, which is 2.79:1 on white. The fixed dark green
+                // is 5.47:1 either way. Brand green alone is only 3.68:1, and
+                // labelLarge at 14px counts as normal text, not large.
+                foregroundColor: AppColors.primaryDark,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.xxl, vertical: AppSpacing.lg),
@@ -330,7 +360,9 @@ class _PerksScreenState extends State<PerksScreen> {
                     borderRadius: BorderRadius.circular(AppRadius.md)),
                 textStyle: AppTypography.labelLarge,
               ),
-              child: const Text('Start Consult Now'),
+              // The flow behind this asks for a preferred date and ends in "we
+              // will contact you soon", so the label says request, not start.
+              child: const Text('Request a Consult'),
             ),
           ),
         ],
@@ -338,45 +370,4 @@ class _PerksScreenState extends State<PerksScreen> {
     );
   }
 
-  Widget _perkCard(String title, IconData icon, Color color, String sub,
-      VoidCallback onTap, ThemeColors tc) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        child: Container(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          decoration: BoxDecoration(
-            color: tc.surface,
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            boxShadow: AppElevation.subtle,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(AppRadius.md)),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(title,
-                  style: AppTypography.labelLarge
-                      .copyWith(color: tc.neutral90),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
-              const SizedBox(height: AppSpacing.xs),
-              Text(sub,
-                  style: AppTypography.caption
-                      .copyWith(color: tc.neutral60)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
