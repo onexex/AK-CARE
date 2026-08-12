@@ -75,7 +75,6 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
     try {
       await CommunityService.addComment(
         postId: _post.id,
-        userId: widget.currentUserId,
         comment: text,
       );
       _loadComments();
@@ -101,7 +100,6 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
     try {
       await CommunityService.addReply(
         commentId: commentId,
-        userId: widget.currentUserId,
         reply: text,
       );
       setState(() => _replyingToCommentId = null);
@@ -121,7 +119,7 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
   Future<void> _deleteComment(int commentId) async {
     try {
       await CommunityService.deleteComment(
-          commentId: commentId, userId: widget.currentUserId);
+commentId: commentId);
       _loadComments();
     } catch (_) {}
   }

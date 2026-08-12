@@ -1,16 +1,28 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
-import 'dart:convert';
 import 'design_system/app_theme.dart';
 import 'design_system/app_colors.dart';
+import 'core/api.dart';
+import 'core/session.dart';
 import 'core/theme_controller.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_dashboard.dart';
 
+/// Lets the app return to sign-in from wherever it is when a token is rejected,
+/// without every screen having to know how.
+final navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+
+  Api.onUnauthenticated = () {
+    navigatorKey.currentState?.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  };
+
   runApp(const MyApp());
 }
 
@@ -19,11 +31,11 @@ class MyApp extends StatelessWidget {
 
   Future<Widget> _checkLoginStatus() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? userJson = prefs.getString('user_session');
-      if (userJson != null) {
-        final Map<String, dynamic> userData = json.decode(userJson);
-        return HomeDashboard(userData: userData);
+      // A stored member with no token is a session from a build that predates
+      // authentication. It looks signed in, and every request would 401.
+      if (await Session.isSignedIn()) {
+        final userData = await Session.user();
+        if (userData != null) return HomeDashboard(userData: userData);
       }
     } catch (e) {
       debugPrint('Error reading session: $e');
@@ -37,6 +49,7 @@ class MyApp extends StatelessWidget {
       valueListenable: themeController,
       builder: (context, themeMode, _) {
         return MaterialApp(
+          navigatorKey: navigatorKey,
           debugShowCheckedModeBanner: false,
           title: 'AK CARE',
           theme: AppTheme.light,

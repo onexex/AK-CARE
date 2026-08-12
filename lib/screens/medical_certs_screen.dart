@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import '../core/config.dart';
+import '../core/api.dart';
 import '../design_system/app_colors.dart';
 import '../design_system/theme_colors.dart';
 import '../design_system/app_radius.dart';
@@ -32,21 +29,13 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
   Future<void> _loadRequests() async {
     setState(() => _isLoading = true);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final json = prefs.getString('user_session');
-      if (json != null) {
-        final user = jsonDecode(json);
-        final res = await http.get(
-          Uri.parse('${AppConfig.baseUrl}/medical_certs.php?user_id=${user['id']}'),
-        ).timeout(AppConfig.apiTimeout);
-        final data = jsonDecode(res.body);
-        if (data['status'] == 'success') {
-          setState(() {
-            _requests = List<Map<String, dynamic>>.from(data['data'] ?? []);
-            _isLoading = false;
-          });
-          return;
-        }
+      final data = await Api.get('medical_certs.php');
+      if (data['status'] == 'success') {
+        setState(() {
+          _requests = List<Map<String, dynamic>>.from(data['data'] ?? []);
+          _isLoading = false;
+        });
+        return;
       }
     } catch (_) {}
     setState(() => _isLoading = false);
@@ -97,14 +86,10 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
                       final navigator = Navigator.of(ctx);
 
                       try {
-                        final prefs = await SharedPreferences.getInstance();
-                        final json = prefs.getString('user_session');
-                        final user = jsonDecode(json!);
-                        final res = await http.post(
-                          Uri.parse('${AppConfig.baseUrl}/medical_certs.php'),
-                          body: {'user_id': user['id'].toString(), 'reason': reasonCtrl.text.trim()},
-                        ).timeout(AppConfig.apiTimeout);
-                        final result = jsonDecode(res.body);
+                        final result = await Api.post(
+                          'medical_certs.php',
+                          body: {'reason': reasonCtrl.text.trim()},
+                        );
                         navigator.pop();
                         messenger.showSnackBar(SnackBar(
                           content: Text(result['message'] ?? 'Request submitted'),

@@ -1,8 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
-import '../core/config.dart';
+import '../core/api.dart';
+import '../core/session.dart';
 import '../core/format.dart';
 import '../design_system/app_colors.dart';
 import '../design_system/theme_colors.dart';
@@ -42,8 +40,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _logout(BuildContext context) async {
     final confirmed = await AppDialog.show(context: context, title: 'Log Out', message: 'Are you sure you want to log out?', confirmLabel: 'Log Out', isDestructive: true, icon: Icons.logout_rounded);
     if (confirmed != true || !context.mounted) return;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('user_session');
+    // Revoke on the server first so a copy of the token cannot be replayed; the
+    // local clear happens either way, since someone tapping Log Out with no
+    // connection should still end up logged out.
+    try {
+      await Api.post('logout.php');
+    } catch (_) {}
+    await Session.clear();
     if (context.mounted) { Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginScreen()), (route) => false); }
   }
 
@@ -77,11 +80,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               final messenger = ScaffoldMessenger.of(context);
               final navigator = Navigator.of(ctx);
               try {
-                final res = await http.post(Uri.parse('${AppConfig.baseUrl}/update_profile.php'), body: {'user_id': _user['id']?.toString() ?? '', 'contact': contactCtrl.text.trim(), 'm_fname': fnameCtrl.text.trim(), 'm_surname': lnameCtrl.text.trim()}).timeout(AppConfig.apiTimeout);
-                final result = jsonDecode(res.body);
+                // The profile updated is the token holder's. A user_id here was
+                // enough to rewrite any member's name and contact number.
+                final result = await Api.post('update_profile.php', body: {'contact': contactCtrl.text.trim(), 'm_fname': fnameCtrl.text.trim(), 'm_surname': lnameCtrl.text.trim()});
                 if (result['status'] == 'success') {
                   if (mounted) setState(() { _user['contact'] = contactCtrl.text.trim(); _user['full_name'] = '${fnameCtrl.text.trim()} ${lnameCtrl.text.trim()}'.trim(); });
-                  final prefs = await SharedPreferences.getInstance(); await prefs.setString('user_session', jsonEncode(_user));
+                  await Session.updateUser(_user);
                   navigator.pop();
                   messenger.showSnackBar(const SnackBar(content: Text('Profile updated successfully'), backgroundColor: Colors.green, behavior: SnackBarBehavior.floating));
                 } else {

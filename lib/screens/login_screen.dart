@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../core/config.dart';
+import '../core/session.dart';
 import '../design_system/theme_colors.dart';
 import '../design_system/app_radius.dart';
 import '../design_system/app_spacing.dart';
@@ -108,10 +108,23 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       final data = json.decode(response.body);
       if (data['status'] == 'success') {
-        final prefs = await SharedPreferences.getInstance();
-        if (data['user'] != null) {
-          await prefs.setString('user_session', json.encode(data['user']));
+        // The token is the whole point of verifying: from here on the app
+        // proves who it is instead of naming a member on every request. A
+        // response without one means an old server, and continuing would leave
+        // the member staring at 401s on every screen.
+        final token = data['token']?.toString() ?? '';
+
+        if (data['user'] == null || token.isEmpty) {
+          setState(() => _error =
+              'Sign-in is unavailable right now. Please try again later.');
+          return;
         }
+
+        await Session.save(
+          user: Map<String, dynamic>.from(data['user']),
+          token: token,
+        );
+
         if (!mounted) return;
         Navigator.pushReplacement(
           context,

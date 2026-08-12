@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../core/api.dart';
+import '../core/session.dart';
 import '../design_system/app_colors.dart';
 import '../design_system/theme_colors.dart';
 import '../design_system/app_radius.dart';
@@ -16,9 +17,6 @@ import 'perks_screen.dart';
 import 'profile_screen.dart';
 import 'community_feed_screen.dart';
 import 'notifications_screen.dart';
-import 'package:http/http.dart' as http;
-import '../core/config.dart';
-import 'dart:convert';
 
 class HomeDashboard extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -44,11 +42,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
   Future<void> _loadActivity() async {
     try {
-      final userId = widget.userData['id']?.toString() ?? '';
-      final res = await http.get(
-        Uri.parse('${AppConfig.baseUrl}/community/dashboard_activity.php?user_id=$userId'),
-      ).timeout(const Duration(seconds: 5));
-      final data = jsonDecode(res.body);
+      final data = await Api.get('community/dashboard_activity.php');
       if (data['status'] == 'success') {
         final d = data['data'];
         setState(() {
@@ -133,8 +127,12 @@ class _HomeDashboardState extends State<HomeDashboard> {
       icon: Icons.logout_rounded,
     );
     if (confirmed != true || !context.mounted) return;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('user_session');
+    // Revoke server-side first so a copy of the token cannot be replayed, then
+    // clear locally whether or not that reached the server.
+    try {
+      await Api.post('logout.php');
+    } catch (_) {}
+    await Session.clear();
     if (context.mounted) {
       Navigator.pushAndRemoveUntil(
         context,
@@ -179,7 +177,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
     final tc = ThemeColors.of(context);
     final fullName = widget.userData['full_name'] ?? 'Member';
     final rank = widget.userData['rank'] ?? 'Member';
-    final userId = widget.userData['contact'].toString();
     // Named once: it gates the card and the space the card occupies.
     final showActivity = _activityLoaded &&
         (_unreadNotifs > 0 || _pendingRequests > 0 || _activity != null);
@@ -284,7 +281,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
               // do. It is also shorter than a grid row, so the fold gains ~52dp.
               return Column(children: [
                 GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: crossAxisCount, crossAxisSpacing: AppSpacing.md, mainAxisSpacing: AppSpacing.md, childAspectRatio: 1.2, children: [
-                  AppFeatureTile(title: 'History', subtitle: 'Past consultations', icon: Icons.history_rounded, color: AppColors.featureCertificate, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => HistoryScreen(userId: userId)))),
+                  AppFeatureTile(title: 'History', subtitle: 'Past consultations', icon: Icons.history_rounded, color: AppColors.featureCertificate, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryScreen()))),
                   AppFeatureTile(title: 'Perks', subtitle: 'Benefits & discounts', icon: Icons.card_giftcard_rounded, color: tc.primary, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PerksScreen()))),
                   AppFeatureTile(title: 'News', subtitle: 'Latest updates', icon: Icons.newspaper_rounded, color: AppColors.featureNews, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NewsScreen()))),
                   AppFeatureTile(title: 'Community', subtitle: 'Member posts', icon: Icons.people_rounded, color: AppColors.featureCommunity, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityFeedScreen()))),

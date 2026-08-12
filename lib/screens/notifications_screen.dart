@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import '../services/community_service.dart';
 import '../models/community_post.dart';
 import '../design_system/app_colors.dart';
@@ -29,21 +27,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _loadNotifications() async {
     setState(() => _isLoading = true);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final json = prefs.getString('user_session');
-      if (json != null) {
-        final user = jsonDecode(json);
-        final userId = user['id'].toString();
-        final result = await CommunityService.getNotifications(userId);
-        if (result['status'] == 'success') {
-          setState(() {
-            _notifications = (result['data'] as List)
-                .map((e) => CommunityNotification.fromJson(e))
-                .toList();
-            _isLoading = false;
-          });
-          return;
-        }
+      // No session read: the notifications returned are the caller's own, and
+      // which caller that is, is the server's decision now.
+      final result = await CommunityService.getNotifications();
+      if (result['status'] == 'success') {
+        setState(() {
+          _notifications = (result['data'] as List)
+              .map((e) => CommunityNotification.fromJson(e))
+              .toList();
+          _isLoading = false;
+        });
+        return;
       }
     } catch (_) {}
     setState(() => _isLoading = false);

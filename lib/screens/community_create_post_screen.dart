@@ -10,8 +10,9 @@ import '../widgets/app_button.dart';
 import '../services/community_service.dart';
 
 class CommunityCreatePostScreen extends StatefulWidget {
-  final String userId;
-  const CommunityCreatePostScreen({super.key, required this.userId});
+  // No userId: the post's author is whoever the session says, decided by the
+  // server. Passing one in only ever fed it back as the identity claim.
+  const CommunityCreatePostScreen({super.key});
 
   @override
   State<CommunityCreatePostScreen> createState() =>
@@ -60,7 +61,6 @@ class _CommunityCreatePostScreenState extends State<CommunityCreatePostScreen> {
 
       // Create post
       final result = await CommunityService.createPost(
-        userId: widget.userId,
         content: _contentController.text.trim(),
         images: imagePaths,
       );

@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import 'dart:typed_data';
-import 'package:http/http.dart' as http;
 import 'package:printing/printing.dart';
+import '../core/api.dart';
+import '../core/session.dart';
 import '../widgets/app_status_badge.dart';
 import '../core/format.dart';
 import '../core/prescription_pdf.dart';
 import '../widgets/app_button.dart';
-import '../core/config.dart';
 import '../models/eprescription.dart';
 import '../design_system/app_colors.dart';
 import '../design_system/theme_colors.dart';
@@ -46,25 +44,7 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final json = prefs.getString('user_session');
-
-      if (json == null) {
-        setState(() {
-          _error = 'You are signed out. Sign in again to see your records.';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      final user = jsonDecode(json);
-      final userId = user['id'].toString();
-
-      final res = await http.get(
-        Uri.parse('${AppConfig.baseUrl}/eprescriptions/list.php?user_id=$userId'),
-      ).timeout(AppConfig.apiTimeout);
-
-      final data = jsonDecode(res.body);
+      final data = await Api.get('eprescriptions/list.php');
 
       if (data['status'] == 'success') {
         setState(() {
@@ -80,11 +60,16 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
         _error = data['message']?.toString() ?? 'The server could not return your records.';
         _isLoading = false;
       });
-    } catch (_) {
+    } on ApiException catch (e) {
       // Failing to reach the server used to land on the same empty state as a
       // member who genuinely has no records. On this screen empty is the common,
       // legitimate case — 463 consultations in the whole system carry a doctor's
       // note — so a silent failure here is invisible by design.
+      setState(() {
+        _error = e.message;
+        _isLoading = false;
+      });
+    } catch (_) {
       setState(() {
         _error = 'Could not reach the server. Check your connection and try again.';
         _isLoading = false;
@@ -100,9 +85,7 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
     final messenger = ScaffoldMessenger.of(context);
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final json = prefs.getString('user_session');
-      final user = json != null ? jsonDecode(json) : null;
+      final user = await Session.user();
 
       final bytes = await buildPrescriptionPdf(
         entry: entry,

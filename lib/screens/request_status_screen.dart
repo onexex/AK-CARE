@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../core/config.dart';
+import '../core/api.dart';
 import '../core/format.dart';
 import '../design_system/app_colors.dart';
 import '../design_system/theme_colors.dart';
@@ -37,29 +34,17 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final json = prefs.getString('user_session');
-      if (json != null) {
-        final user = jsonDecode(json);
-        // The member_id, not the contact number: requests are keyed on the
-        // member now, and the server only falls back to the number for rows
-        // filed before that column existed.
-        final userId = user['id'].toString();
-        final response = await http.get(
-          Uri.parse('${AppConfig.baseUrl}/get_my_requests.php?user_id=$userId'),
-        ).timeout(const Duration(seconds: 10));
-        if (response.statusCode == 200) {
-          final result = jsonDecode(response.body);
-          if (result['status'] == 'success') {
-            setState(() {
-              _requests = result['data'] ?? [];
-              _isLoading = false;
-            });
-            return;
-          }
-        }
-        throw Exception('Server error');
+      // Which member's requests these are is settled by the token, not by a
+      // member_id this screen looks up and sends.
+      final result = await Api.get('get_my_requests.php');
+      if (result['status'] == 'success') {
+        setState(() {
+          _requests = result['data'] ?? [];
+          _isLoading = false;
+        });
+        return;
       }
+      throw Exception('Server error');
     } catch (_) {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -96,18 +81,10 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
     final messenger = ScaffoldMessenger.of(context);
 
     try {
-      // The server will only cancel a request belonging to this member, so the
-      // member_id has to go with it — the same value the list is fetched with
-      // above.
-      final prefs = await SharedPreferences.getInstance();
-      final json = prefs.getString('user_session');
-      final userId = json != null ? jsonDecode(json)['id'].toString() : '';
-
-      final response = await http.post(
-        Uri.parse('${AppConfig.baseUrl}/cancel_request.php'),
-        body: {'id': requestId, 'user_id': userId},
-      ).timeout(const Duration(seconds: 10));
-      final result = jsonDecode(response.body);
+      // The server cancels only a request belonging to the token holder, so
+      // nothing about who is asking needs to be sent.
+      final result =
+          await Api.post('cancel_request.php', body: {'id': requestId});
       if (result['status'] == 'success') {
         messenger.showSnackBar(
           const SnackBar(

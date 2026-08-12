@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-import '../core/config.dart';
+import '../core/api.dart';
 import '../design_system/app_colors.dart';
 import '../design_system/theme_colors.dart';
 import '../design_system/app_radius.dart';
@@ -16,7 +14,6 @@ import 'request_status_screen.dart';
 import 'eprescription_screen.dart';
 import 'pharmacy_discounts_screen.dart';
 import 'medical_certs_screen.dart';
-import 'package:http/http.dart' as http;
 
 class PerksScreen extends StatefulWidget {
   const PerksScreen({super.key});
@@ -136,20 +133,17 @@ class _PerksScreenState extends State<PerksScreen> {
                       final navigator = Navigator.of(ctx);
 
                       try {
-                        final prefs = await SharedPreferences.getInstance();
-                        final json = prefs.getString('user_session');
-                        if (json != null) {
-                          final user = jsonDecode(json);
-                          final response = await http.post(
-                            Uri.parse('${AppConfig.baseUrl}/save_teleconsult.php'),
+                        {
+                          // Neither the member nor their number is sent: the
+                          // server files the request for the token holder, on
+                          // the number the registry holds for them.
+                          final result = await Api.post(
+                            'save_teleconsult.php',
                             body: {
-                              'user_id': user['id'].toString(),
                               'consultation_reason': reasonCtrl.text,
                               'preferred_date': dateCtrl.text,
-                              'phone_number': user['contact'] ?? '',
                             },
-                          ).timeout(const Duration(seconds: 10));
-                          final result = jsonDecode(response.body);
+                          );
                           if (result['status'] == 'success') {
                             navigator.pop();
                             messenger.showSnackBar(

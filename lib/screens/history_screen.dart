@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import '../core/config.dart';
+import '../core/api.dart';
 import '../core/format.dart';
 import '../design_system/theme_colors.dart';
 import '../design_system/app_radius.dart';
@@ -12,8 +10,9 @@ import '../widgets/app_empty_state.dart';
 import '../widgets/app_status_badge.dart';
 
 class HistoryScreen extends StatefulWidget {
-  final String userId;
-  const HistoryScreen({super.key, required this.userId});
+  // No userId: the history returned is the token holder's, decided server-side.
+  // Passing one in only ever fed it back as the identity claim.
+  const HistoryScreen({super.key});
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
@@ -39,16 +38,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<List<dynamic>> _fetchHistory() async {
     try {
-      final response = await http.get(
-        Uri.parse(
-            '${AppConfig.baseUrl}/get_history.php?user_id=${widget.userId}'),
-      ).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['status'] == 'success') {
-          _allItems = data['data'];
-          return _allItems;
-        }
+      // Whose history this is, is the server's decision now — it used to be
+      // decided by a phone number in the query string.
+      final data = await Api.get('get_history.php');
+      if (data['status'] == 'success') {
+        _allItems = data['data'];
+        return _allItems;
       }
     } catch (_) {}
     return [];

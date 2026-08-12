@@ -68,7 +68,6 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
     try {
       final result = await CommunityService.getFeed(
         page: _page,
-        userId: _currentUserId,
       );
 
       if (result['status'] == 'success') {
@@ -118,7 +117,6 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
     try {
       await CommunityService.toggleLike(
         postId: post.id,
-        userId: _currentUserId,
       );
     } catch (_) {
       setState(() {
@@ -208,9 +206,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
           final created = await Navigator.push<bool>(
             context,
             MaterialPageRoute(
-                builder: (_) => CommunityCreatePostScreen(
-                      userId: _currentUserId,
-                    )),
+                builder: (_) => const CommunityCreatePostScreen()),
           );
           if (created == true) _loadFeed(refresh: true);
         },
@@ -676,7 +672,6 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                       try {
                         final result = await CommunityService.reportPost(
                           postId: post.id,
-                          userId: _currentUserId,
                           reason: reason,
                         );
                         if (context.mounted) {
@@ -715,7 +710,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
   Future<void> _deletePost(CommunityPost post) async {
     try {
       await CommunityService.deletePost(
-          postId: post.id, userId: _currentUserId);
+postId: post.id);
       _loadFeed(refresh: true);
     } catch (_) {
       if (mounted) {
