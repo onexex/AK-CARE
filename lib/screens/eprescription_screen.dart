@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:printing/printing.dart';
+import '../widgets/app_status_badge.dart';
 import '../core/format.dart';
 import '../core/prescription_pdf.dart';
 import '../widgets/app_button.dart';
@@ -28,6 +29,10 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
   List<EPrescription> _prescriptions = [];
   bool _isLoading = true;
 
+  /// Set when the load failed, so a broken connection cannot be mistaken for a
+  /// member who simply has no records.
+  String? _error;
+
   @override
   void initState() {
     super.initState();
@@ -35,31 +40,56 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
   }
 
   Future<void> _loadPrescriptions() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final json = prefs.getString('user_session');
-      if (json != null) {
-        final user = jsonDecode(json);
-        final userId = user['id'].toString();
 
-        final res = await http.get(
-          Uri.parse('${AppConfig.baseUrl}/eprescriptions/list.php?user_id=$userId'),
-        ).timeout(AppConfig.apiTimeout);
-
-        final data = jsonDecode(res.body);
-        if (data['status'] == 'success') {
-          setState(() {
-            _prescriptions = (data['data'] as List)
-                .map((e) => EPrescription.fromJson(e))
-                .toList();
-            _isLoading = false;
-          });
-          return;
-        }
+      if (json == null) {
+        setState(() {
+          _error = 'You are signed out. Sign in again to see your records.';
+          _isLoading = false;
+        });
+        return;
       }
-    } catch (_) {}
-    setState(() => _isLoading = false);
+
+      final user = jsonDecode(json);
+      final userId = user['id'].toString();
+
+      final res = await http.get(
+        Uri.parse('${AppConfig.baseUrl}/eprescriptions/list.php?user_id=$userId'),
+      ).timeout(AppConfig.apiTimeout);
+
+      final data = jsonDecode(res.body);
+
+      if (data['status'] == 'success') {
+        setState(() {
+          _prescriptions = (data['data'] as List)
+              .map((e) => EPrescription.fromJson(e))
+              .toList();
+          _isLoading = false;
+        });
+        return;
+      }
+
+      setState(() {
+        _error = data['message']?.toString() ?? 'The server could not return your records.';
+        _isLoading = false;
+      });
+    } catch (_) {
+      // Failing to reach the server used to land on the same empty state as a
+      // member who genuinely has no records. On this screen empty is the common,
+      // legitimate case — 463 consultations in the whole system carry a doctor's
+      // note — so a silent failure here is invisible by design.
+      setState(() {
+        _error = 'Could not reach the server. Check your connection and try again.';
+        _isLoading = false;
+      });
+    }
   }
 
   /// Hands the rendered PDF to the platform's share sheet, which is also where
@@ -143,6 +173,7 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
                     ],
                   ),
                 ),
+                _reviewBadge(tc, prescription),
               ],
             ),
             const SizedBox(height: AppSpacing.xxl),
@@ -219,6 +250,25 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
     );
   }
 
+  /// Where the consultation sits in the review workflow, or nothing when the
+  /// record does not reliably say. Same rule as History: `doctor_status` is
+  /// trusted where it reads reviewed and never inferred from its absence.
+  Widget _reviewBadge(ThemeColors tc, EPrescription entry) {
+    return switch (entry.reviewStatus) {
+      'approved' => AppStatusBadge(
+          status: 'Approved',
+          color: tc.successText,
+          backgroundColor: tc.successSurface,
+        ),
+      'reviewed' => AppStatusBadge(
+          status: 'Reviewed',
+          color: tc.infoText,
+          backgroundColor: tc.infoSurface,
+        ),
+      _ => const SizedBox.shrink(),
+    };
+  }
+
   /// Free text as written by the doctor, newlines preserved.
   Widget _textCard(ThemeColors tc, String value, {bool accent = false}) {
     return Container(
@@ -246,7 +296,19 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
       appBar: AppBar(title: const Text('E-Prescriptions')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _prescriptions.isEmpty
+          : _error != null
+              ? ListView(children: [
+                  SizedBox(
+                      height: MediaQuery.of(context).size.height * 0.5,
+                      child: AppEmptyState(
+                        icon: Icons.cloud_off_rounded,
+                        title: 'Could not load your records',
+                        subtitle: _error!,
+                        actionLabel: 'Try Again',
+                        onAction: _loadPrescriptions,
+                      )),
+                ])
+              : _prescriptions.isEmpty
               ? ListView(children: [
                   SizedBox(
                       height: MediaQuery.of(context).size.height * 0.5,
@@ -317,6 +379,8 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
                                     ],
                                   ),
                                 ),
+                                _reviewBadge(tc, p),
+                                const SizedBox(width: AppSpacing.sm),
                                 Icon(Icons.chevron_right,
                                     color: tc.neutral50, size: 20),
                               ],
