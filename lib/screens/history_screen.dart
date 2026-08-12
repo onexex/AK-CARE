@@ -143,9 +143,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   /// The one review state this screen can honestly show.
   ///
-  /// Deliberately not AppStatusBadge.fromStatus(): that factory falls through
-  /// to 'Pending' for anything it does not recognise, which is exactly how a
-  /// missing field turned into a status claim on every consultation here.
+  /// Built directly rather than through AppStatusBadge.fromStatus(), which maps
+  /// the teleconsult_requests workflow states — 'reviewed' is not one of them,
+  /// and would come back as a neutral badge reading "reviewed".
   Widget _reviewedBadge(ThemeColors tc) => AppStatusBadge(
         status: 'Reviewed',
         color: tc.successText,

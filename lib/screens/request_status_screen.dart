@@ -154,7 +154,7 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
                       style: AppTypography.titleLarge
                           .copyWith(color: tc.neutral100)),
                   const Spacer(),
-                  AppStatusBadge.fromStatus(context, req['status'] ?? 'Pending'),
+                  AppStatusBadge.fromStatus(context, req['status']?.toString()),
                 ],
               ),
               const Divider(height: AppSpacing.xxxl),
@@ -401,8 +401,8 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
                                               ],
                                             ),
                                           ),
-                                          AppStatusBadge.fromStatus(
-                                              context, req['status'] ?? 'Pending'),
+                                          AppStatusBadge.fromStatus(context,
+                                              req['status']?.toString()),
                                           const SizedBox(
                                               width: AppSpacing.sm),
                                           Icon(Icons.chevron_right,
