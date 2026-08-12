@@ -41,7 +41,10 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
       final json = prefs.getString('user_session');
       if (json != null) {
         final user = jsonDecode(json);
-        final userId = user['contact'].toString();
+        // The member_id, not the contact number: requests are keyed on the
+        // member now, and the server only falls back to the number for rows
+        // filed before that column existed.
+        final userId = user['id'].toString();
         final response = await http.get(
           Uri.parse('${AppConfig.baseUrl}/get_my_requests.php?user_id=$userId'),
         ).timeout(const Duration(seconds: 10));
@@ -93,13 +96,12 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
     final messenger = ScaffoldMessenger.of(context);
 
     try {
-      // The server will only cancel a request whose phone number matches this
-      // member's, so the contact has to go with it — the same value the list is
-      // fetched with above.
+      // The server will only cancel a request belonging to this member, so the
+      // member_id has to go with it — the same value the list is fetched with
+      // above.
       final prefs = await SharedPreferences.getInstance();
       final json = prefs.getString('user_session');
-      final userId =
-          json != null ? jsonDecode(json)['contact'].toString() : '';
+      final userId = json != null ? jsonDecode(json)['id'].toString() : '';
 
       final response = await http.post(
         Uri.parse('${AppConfig.baseUrl}/cancel_request.php'),
