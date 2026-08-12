@@ -9,6 +9,7 @@ import '../design_system/app_spacing.dart';
 import '../design_system/app_typography.dart';
 import '../design_system/app_elevation.dart';
 import '../widgets/app_empty_state.dart';
+import '../widgets/app_status_badge.dart';
 
 class HistoryScreen extends StatefulWidget {
   final String userId;
@@ -111,8 +112,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     ],
                   ),
                 ),
-                // Badge omitted for the same reason as the list row: there is no
-                // status field behind it.
+                // Same rule as the list row: shown only when a doctor reviewed
+                // this consultation, absent when that is unknown.
+                if (item['review_status'] == 'reviewed') _reviewedBadge(tc),
               ],
             ),
             const SizedBox(height: AppSpacing.xxl),
@@ -138,6 +140,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   bool _hasValue(dynamic v) =>
       v != null && v.toString().isNotEmpty && v.toString() != 'None';
+
+  /// The one review state this screen can honestly show.
+  ///
+  /// Deliberately not AppStatusBadge.fromStatus(): that factory falls through
+  /// to 'Pending' for anything it does not recognise, which is exactly how a
+  /// missing field turned into a status claim on every consultation here.
+  Widget _reviewedBadge(ThemeColors tc) => AppStatusBadge(
+        status: 'Reviewed',
+        color: tc.successText,
+        backgroundColor: tc.successSurface,
+      );
 
   Widget _detailRow(ThemeColors tc, String label, String value) {
     return Padding(
@@ -285,14 +298,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       ],
                                     ),
                                   ),
-                                  // No status badge here. tblcrmlogsdata has no
-                                  // 'status' column, so this read null and fell
-                                  // through to 'Pending' on every row —
-                                  // consultations from 2022 included. The only
-                                  // candidate is doctor_status, a 0/1 flag whose
-                                  // meaning is not settled; restore the badge
-                                  // once it is, rather than assert something
-                                  // false about a medical record.
+                                  // Only ever shown for a consultation a doctor
+                                  // has demonstrably reviewed. The server sends
+                                  // review_status as null for everything else,
+                                  // including the ambiguous rows that used to
+                                  // read 'Pending' — see get_history.php.
+                                  if (item['review_status'] == 'reviewed') ...[
+                                    _reviewedBadge(tc),
+                                    const SizedBox(width: AppSpacing.sm),
+                                  ],
                                   Icon(Icons.chevron_right,
                                       color: tc.neutral50, size: 20),
                                 ],
