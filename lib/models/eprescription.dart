@@ -1,74 +1,51 @@
+/// The doctor's half of a consultation: what they prescribed, and what they
+/// wrote back to the member.
+///
+/// This used to model the `eprescriptions` / `eprescription_items` tables, which
+/// have never held a row — nothing writes to them. The real record lives on
+/// `consultations`, written by the review screen in the back office, and it is
+/// free text rather than a structured medicine list: there are no dosage,
+/// frequency or quantity fields behind it to show.
 class EPrescription {
   final int id;
-  final int userId;
+  final String consultedOn;
   final String doctorName;
-  final String diagnosis;
-  final String notes;
-  final String status;
-  final String createdAt;
-  final List<EPrescriptionItem> items;
-  final int itemsCount;
 
-  EPrescription({
+  /// What the member came in with, for context on which consultation this is.
+  final String complaint;
+
+  /// The doctor's prescription, as written. Empty on every record so far — the
+  /// legacy CRM never captured one and the review screen is new — so the UI has
+  /// to read as a doctor's note when this is blank rather than an empty script.
+  final String prescription;
+
+  /// The doctor's written answer: advice, follow-up, a referral.
+  final String notes;
+
+  /// 'approved', 'reviewed', or null when the record says nothing reliable.
+  final String? reviewStatus;
+
+  const EPrescription({
     required this.id,
-    required this.userId,
+    required this.consultedOn,
     required this.doctorName,
-    required this.diagnosis,
+    required this.complaint,
+    required this.prescription,
     required this.notes,
-    required this.status,
-    required this.createdAt,
-    required this.items,
-    required this.itemsCount,
+    required this.reviewStatus,
   });
+
+  bool get hasPrescription => prescription.isNotEmpty;
 
   factory EPrescription.fromJson(Map<String, dynamic> json) {
     return EPrescription(
       id: json['id'] ?? 0,
-      userId: json['user_id'] ?? 0,
-      doctorName: json['doctor_name'] ?? '',
-      diagnosis: json['diagnosis'] ?? '',
-      notes: json['notes'] ?? '',
-      status: json['status'] ?? 'active',
-      createdAt: json['created_at'] ?? '',
-      items: (json['items'] as List<dynamic>? ?? [])
-          .map((i) => EPrescriptionItem.fromJson(i))
-          .toList(),
-      itemsCount: json['items_count'] ?? 0,
-    );
-  }
-}
-
-class EPrescriptionItem {
-  final int id;
-  final int prescriptionId;
-  final String medicineName;
-  final String dosage;
-  final String frequency;
-  final String duration;
-  final String quantity;
-  final String notes;
-
-  EPrescriptionItem({
-    required this.id,
-    required this.prescriptionId,
-    required this.medicineName,
-    required this.dosage,
-    required this.frequency,
-    required this.duration,
-    required this.quantity,
-    required this.notes,
-  });
-
-  factory EPrescriptionItem.fromJson(Map<String, dynamic> json) {
-    return EPrescriptionItem(
-      id: json['id'] ?? 0,
-      prescriptionId: json['prescription_id'] ?? 0,
-      medicineName: json['medicine_name'] ?? '',
-      dosage: json['dosage'] ?? '',
-      frequency: json['frequency'] ?? '',
-      duration: json['duration'] ?? '',
-      quantity: json['quantity'] ?? '',
-      notes: json['notes'] ?? '',
+      consultedOn: json['consulted_on']?.toString() ?? '',
+      doctorName: json['doctor_name']?.toString() ?? '',
+      complaint: json['complaint']?.toString() ?? '',
+      prescription: json['prescription']?.toString() ?? '',
+      notes: json['notes']?.toString() ?? '',
+      reviewStatus: json['review_status']?.toString(),
     );
   }
 }

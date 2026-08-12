@@ -94,10 +94,13 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Prescription',
+                      Text(
+                          prescription.hasPrescription
+                              ? 'Prescription'
+                              : "Doctor's Notes",
                           style: AppTypography.titleLarge
                               .copyWith(color: tc.neutral100)),
-                      Text(formatRelativeDate(prescription.createdAt),
+                      Text(formatRelativeDate(prescription.consultedOn),
                           style: AppTypography.caption
                               .copyWith(color: tc.textSecondary)),
                     ],
@@ -111,25 +114,30 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
             _infoCard(tc, 'Doctor', prescription.doctorName.isNotEmpty
                 ? prescription.doctorName
                 : 'Not specified'),
-            _infoCard(tc, 'Diagnosis', prescription.diagnosis.isNotEmpty
-                ? prescription.diagnosis
-                : 'Not specified'),
-            if (prescription.notes.isNotEmpty)
-              _infoCard(tc, 'Notes', prescription.notes),
+            if (prescription.complaint.isNotEmpty)
+              _infoCard(tc, 'Complaint', prescription.complaint),
 
             const SizedBox(height: AppSpacing.lg),
 
-            // Medicines list
-            Text('Medicines (${prescription.items.length})',
-                style: AppTypography.titleMedium
-                    .copyWith(color: tc.neutral100)),
-            const SizedBox(height: AppSpacing.md),
+            // The prescription as the doctor wrote it. Free text, not a
+            // structured medicine list — there is no dosage or frequency behind
+            // it to lay out in columns.
+            if (prescription.hasPrescription) ...[
+              Text('Prescription',
+                  style: AppTypography.titleMedium
+                      .copyWith(color: tc.neutral100)),
+              const SizedBox(height: AppSpacing.md),
+              _textCard(tc, prescription.prescription, accent: true),
+              const SizedBox(height: AppSpacing.lg),
+            ],
 
-            if (prescription.items.isEmpty)
-              Text('No medicines listed.',
-                  style: AppTypography.bodyMedium.copyWith(color: tc.textSecondary))
-            else
-              ...prescription.items.map((item) => _medicineCard(tc, item)),
+            if (prescription.notes.isNotEmpty) ...[
+              Text("Doctor's Notes",
+                  style: AppTypography.titleMedium
+                      .copyWith(color: tc.neutral100)),
+              const SizedBox(height: AppSpacing.md),
+              _textCard(tc, prescription.notes),
+            ],
 
             const SizedBox(height: AppSpacing.xxl),
           ],
@@ -166,55 +174,22 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
     );
   }
 
-  Widget _medicineCard(ThemeColors tc, EPrescriptionItem item) {
+  /// Free text as written by the doctor, newlines preserved.
+  Widget _textCard(ThemeColors tc, String value, {bool accent = false}) {
     return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: tc.surface,
         borderRadius: BorderRadius.circular(AppRadius.md),
         boxShadow: AppElevation.subtle,
-        border: const Border(
-          left: BorderSide(color: AppColors.featureNews, width: 3),
-        ),
+        border: accent
+            ? const Border(
+                left: BorderSide(color: AppColors.featureNews, width: 3),
+              )
+            : null,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(item.medicineName,
-              style: AppTypography.titleMedium
-                  .copyWith(color: tc.neutral100)),
-          const SizedBox(height: AppSpacing.sm),
-          _medRow(tc, 'Dosage', item.dosage),
-          _medRow(tc, 'Frequency', item.frequency),
-          _medRow(tc, 'Duration', item.duration),
-          _medRow(tc, 'Quantity', item.quantity),
-          if (item.notes.isNotEmpty)
-            _medRow(tc, 'Notes', item.notes),
-        ],
-      ),
-    );
-  }
-
-  Widget _medRow(ThemeColors tc, String label, String value) {
-    if (value.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.xs),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(label,
-                style: AppTypography.caption
-                    .copyWith(color: tc.textSecondary)),
-          ),
-          Expanded(
-            child: Text(value,
-                style: AppTypography.bodySmall
-                    .copyWith(color: tc.neutral80)),
-          ),
-        ],
-      ),
+      child: Text(value,
+          style: AppTypography.bodyMedium.copyWith(color: tc.neutral90)),
     );
   }
 
@@ -232,8 +207,9 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
                       height: MediaQuery.of(context).size.height * 0.5,
                       child: const AppEmptyState(
                         icon: Icons.medication_liquid_rounded,
-                        title: 'No E-Prescriptions',
-                        subtitle: 'Your e-prescriptions will appear here.',
+                        title: 'Nothing from a doctor yet',
+                        subtitle:
+                            'Prescriptions and doctor\'s notes from your consultations will appear here.',
                       )),
                 ])
               : ListView.builder(
@@ -280,14 +256,17 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
                                       Text(
                                           p.doctorName.isNotEmpty
                                               ? p.doctorName
-                                              : 'E-Prescription',
+                                              : 'Attending doctor',
                                           style: AppTypography.titleMedium
                                               .copyWith(
                                                   color:
                                                       tc.neutral100)),
                                       const SizedBox(height: 4),
+                                      // Says which of the two this record is,
+                                      // rather than counting medicines that are
+                                      // not itemised anywhere.
                                       Text(
-                                          '${p.itemsCount} medicine(s) · ${formatRelativeDate(p.createdAt)}',
+                                          '${p.hasPrescription ? 'Prescription' : "Doctor's notes"} · ${formatRelativeDate(p.consultedOn)}',
                                           style: AppTypography.caption.copyWith(
                                               color: tc.textSecondary)),
                                     ],
