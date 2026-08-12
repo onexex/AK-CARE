@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:printing/printing.dart';
 import '../core/format.dart';
+import '../core/prescription_pdf.dart';
+import '../widgets/app_button.dart';
 import '../core/config.dart';
 import '../models/eprescription.dart';
 import '../design_system/app_colors.dart';
@@ -56,6 +60,39 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
       }
     } catch (_) {}
     setState(() => _isLoading = false);
+  }
+
+  /// Hands the rendered PDF to the platform's share sheet, which is also where
+  /// "save to Files"/"save to Drive" live — one action covers both.
+  Future<void> _downloadPdf(EPrescription entry) async {
+    // Resolved before the async gap: the sheet this was tapped from may be gone
+    // by the time the PDF is built.
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final json = prefs.getString('user_session');
+      final user = json != null ? jsonDecode(json) : null;
+
+      final bytes = await buildPrescriptionPdf(
+        entry: entry,
+        patientName: user?['full_name']?.toString() ?? '',
+        memberId: user?['id']?.toString() ?? '',
+      );
+
+      await Printing.sharePdf(
+        bytes: Uint8List.fromList(bytes),
+        filename: prescriptionFileName(entry, user?['id']?.toString() ?? 'member'),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Could not create the PDF. $e'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _showDetails(EPrescription prescription) {
@@ -138,6 +175,14 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
               const SizedBox(height: AppSpacing.md),
               _textCard(tc, prescription.notes),
             ],
+
+            const SizedBox(height: AppSpacing.xxl),
+            AppButton(
+              label: 'Download PDF',
+              icon: Icons.download_rounded,
+              isFullWidth: true,
+              onPressed: () => _downloadPdf(prescription),
+            ),
 
             const SizedBox(height: AppSpacing.xxl),
           ],
