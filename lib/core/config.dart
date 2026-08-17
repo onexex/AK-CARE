@@ -28,13 +28,11 @@ class AppConfig {
   static const String baseUrl = 'http://$_host/$_backendPath';
 
   // ── Endpoints ──
-  // Sign-in no longer has entries here: check_user and verify_otp go through
-  // Api.postPublic, which is what that method is for. A ready-made full URL is
-  // an invitation to reach for `http` directly and miss the timeout, the JSON
-  // handling and the one seam tests have — which is how the sign-in screen
-  // came to be untestable in the first place.
-  static const String getHistoryUrl = '$baseUrl/get_history.php';
-  static const String getNewsUrl = '$baseUrl/get_news.php';
+  // Deliberately none. Every screen names its endpoint through Api, which is
+  // what carries the token, the timeout, the JSON handling, the 401 sign-out
+  // and the one seam tests have. A ready-made full URL here is an invitation
+  // to reach for `http` directly and miss all five — which is exactly how the
+  // sign-in, news and pharmacy screens each came to be untestable.
 
   // ── Timeout ──
   static const Duration apiTimeout = Duration(seconds: 10);

@@ -70,6 +70,28 @@ class Api {
         .timeout(AppConfig.apiTimeout));
   }
 
+  /// A GET whose body is a bare JSON array rather than the usual
+  /// `{status, data}` envelope.
+  ///
+  /// `get_news.php` predates that convention and returns the rows directly, so
+  /// [get] cannot read it — the cast to a map is what fails. This is a
+  /// concession to one older endpoint, not a second way of doing things: a new
+  /// endpoint should use the envelope and [get].
+  static Future<List<dynamic>> getList(
+    String path, {
+    Map<String, String>? query,
+  }) async {
+    final uri = Uri.parse('${AppConfig.baseUrl}/$path')
+        .replace(queryParameters: query);
+
+    final body = await _decode(() async => client
+        .get(uri, headers: await _headers())
+        .timeout(AppConfig.apiTimeout));
+
+    if (body is List) return body;
+    throw const ApiException('The server sent something unreadable.');
+  }
+
   static Future<Map<String, dynamic>> post(
     String path, {
     Map<String, String>? body,
@@ -116,6 +138,17 @@ class Api {
 
   static Future<Map<String, dynamic>> _send(
       Future<http.Response> Function() request) async {
+    final body = await _decode(request);
+
+    if (body is Map<String, dynamic>) return body;
+    throw const ApiException('The server sent something unreadable.');
+  }
+
+  /// Everything the transport owes a caller — reachability, the 401 sign-out,
+  /// and readable JSON — with no opinion about the shape that comes back. Both
+  /// [_send] and [getList] then check for the shape they need.
+  static Future<dynamic> _decode(
+      Future<http.Response> Function() request) async {
     final http.Response res;
 
     try {
@@ -131,7 +164,7 @@ class Api {
     }
 
     try {
-      return jsonDecode(res.body) as Map<String, dynamic>;
+      return jsonDecode(res.body);
     } catch (_) {
       throw const ApiException('The server sent something unreadable.');
     }

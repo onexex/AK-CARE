@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:intl/intl.dart';
-import '../core/config.dart';
+import '../core/api.dart';
 import '../design_system/theme_colors.dart';
 import '../design_system/app_radius.dart';
 import '../design_system/app_spacing.dart';
@@ -30,8 +28,11 @@ class _NewsScreenState extends State<NewsScreen> {
 
   Future<List<NewsArticle>> _fetchNews() async {
     try {
-      final response = await http.get(Uri.parse('${AppConfig.baseUrl}/get_news.php')).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) { final List<dynamic> data = json.decode(response.body); _allNews = data.map((e) => NewsArticle.fromJson(e)).toList(); return _allNews; }
+      // getList, not get: this endpoint answers with a bare array rather than
+      // the {status, data} envelope the rest of the API uses.
+      final data = await Api.getList('get_news.php');
+      _allNews = data.map((e) => NewsArticle.fromJson(e)).toList();
+      return _allNews;
     } catch (_) {}
     return [];
   }

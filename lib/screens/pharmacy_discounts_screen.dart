@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import '../core/config.dart';
+import '../core/api.dart';
 import '../design_system/app_colors.dart';
 import '../design_system/theme_colors.dart';
 import '../design_system/app_radius.dart';
@@ -29,10 +27,7 @@ class _PharmacyDiscountsScreenState extends State<PharmacyDiscountsScreen> {
   Future<void> _loadPharmacies() async {
     setState(() => _isLoading = true);
     try {
-      final res = await http.get(
-        Uri.parse('${AppConfig.baseUrl}/pharmacy_discounts.php'),
-      ).timeout(AppConfig.apiTimeout);
-      final data = jsonDecode(res.body);
+      final data = await Api.get('pharmacy_discounts.php');
       if (data['status'] == 'success') {
         setState(() {
           _pharmacies = List<Map<String, dynamic>>.from(data['data']);
