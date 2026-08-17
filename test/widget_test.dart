@@ -119,6 +119,27 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the sign-in screen survives a member who scales text up',
+      (tester) async {
+    // The case AppButton's FittedBox actually exists for. At 1.0 the sign-in
+    // label fits with room to spare on a handset; the question is what happens
+    // to the member who has turned text size up, which is the member who can
+    // least afford a clipped instruction. Combined with the placeholder font's
+    // already-generous metrics, 1.3 here is well past anything a real device
+    // asks of this layout.
+    tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _openApp(tester);
+
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('a dashboard that cannot reach the server still renders',
       (tester) async {
     // The offline client above makes every request fail; the member is still
