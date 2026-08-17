@@ -156,10 +156,11 @@ void main() {
 
     testWidgets('a body that is not JSON reads as a failure, not as no news',
         (tester) async {
-      // Exactly what get_news.php sends today when the table is empty: it
-      // echoes '0 results' and then the array, so the body is '0 results[]'.
-      // Until that is fixed server-side this is a failure, and the screen now
-      // says so instead of quietly showing an empty shelf.
+      // '0 results[]' is what get_news.php used to send when the table was
+      // empty — it echoed a message ahead of the JSON. The server no longer
+      // does that, so this is now a guard rather than a live case: whatever
+      // reason a body arrives unreadable, the screen must call it a failure
+      // instead of dressing it up as an empty shelf.
       Api.client = MockClient((_) async => http.Response('0 results[]', 200));
 
       await _show(tester, const NewsScreen());
