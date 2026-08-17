@@ -284,41 +284,49 @@ class _LoginScreenState extends State<LoginScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(4, (i) {
-              return Container(
-                // Width is capped so four boxes still fit a 320dp screen, but
-                // the height is left to the field: at large system font sizes a
-                // fixed 56dp box clipped the 22px digits.
-                constraints: const BoxConstraints(minWidth: 48, maxWidth: 60),
-                margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-                child: TextField(
-                  controller: _otpControllers[i],
-                  focusNode: _otpFocusNodes[i],
-                  keyboardType: TextInputType.number,
-                  maxLength: 1,
-                  textAlign: TextAlign.center,
-                  style: AppTypography.headlineMedium.copyWith(
-                      color: tc.neutral100, letterSpacing: 0),
-                  decoration: InputDecoration(
-                    counterText: '',
-                    contentPadding: EdgeInsets.zero,
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md)),
-                    focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        borderSide: BorderSide(color: tc.primary, width: 2)),
+              // The four boxes divide the row rather than each claiming a fixed
+              // width. The old cap of 60 plus 4dp of margin either side wanted
+              // 272dp; a 360dp phone — the common size, not an edge case — only
+              // offers 264 inside this card, so the fourth box overflowed by
+              // exactly 8. Flexible lets them shrink to whatever is there and
+              // the cap now only stops them sprawling on a tablet. Height is
+              // still left to the field: at large system font sizes a fixed
+              // 56dp box clipped the 22px digits.
+              return Flexible(
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 60),
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+                  child: TextField(
+                    controller: _otpControllers[i],
+                    focusNode: _otpFocusNodes[i],
+                    keyboardType: TextInputType.number,
+                    maxLength: 1,
+                    textAlign: TextAlign.center,
+                    style: AppTypography.headlineMedium.copyWith(
+                        color: tc.neutral100, letterSpacing: 0),
+                    decoration: InputDecoration(
+                      counterText: '',
+                      contentPadding: EdgeInsets.zero,
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md)),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          borderSide: BorderSide(color: tc.primary, width: 2)),
+                    ),
+                    onChanged: (v) {
+                      if (v.isNotEmpty && i < 3) {
+                        _otpFocusNodes[i + 1].requestFocus();
+                      }
+                      if (v.isEmpty && i > 0) {
+                        _otpFocusNodes[i - 1].requestFocus();
+                      }
+                      if (_combinedOtp.length == 4) {
+                        FocusScope.of(context).unfocus();
+                      }
+                      setState(() => _error = null);
+                    },
                   ),
-                  onChanged: (v) {
-                    if (v.isNotEmpty && i < 3) {
-                      _otpFocusNodes[i + 1].requestFocus();
-                    }
-                    if (v.isEmpty && i > 0) {
-                      _otpFocusNodes[i - 1].requestFocus();
-                    }
-                    if (_combinedOtp.length == 4) {
-                      FocusScope.of(context).unfocus();
-                    }
-                    setState(() => _error = null);
-                  },
                 ),
               );
             }),
