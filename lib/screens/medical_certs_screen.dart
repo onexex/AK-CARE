@@ -411,8 +411,14 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? ListView(children: [
-                  SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.4,
+                  // minHeight, not a fixed height. This state carries a button
+                  // as well as the message — about 290dp of content — and a
+                  // rigid fraction of a short screen clips it. Asking for the
+                  // space rather than insisting on it lets it grow with the
+                  // message and the system font.
+                  ConstrainedBox(
+                      constraints: BoxConstraints(
+                          minHeight: MediaQuery.of(context).size.height * 0.4),
                       child: AppEmptyState(
                         icon: Icons.cloud_off_rounded,
                         title: 'Could not load your certificates',
@@ -423,7 +429,9 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
                 ])
               : _requests.isEmpty
               ? ListView(children: [
-                  SizedBox(height: MediaQuery.of(context).size.height * 0.4,
+                  ConstrainedBox(
+                      constraints: BoxConstraints(
+                          minHeight: MediaQuery.of(context).size.height * 0.4),
                       child: const AppEmptyState(icon: Icons.verified_user_rounded, title: 'No Requests', subtitle: 'Tap + to request a medical certificate.'))
                 ])
               : RefreshIndicator(

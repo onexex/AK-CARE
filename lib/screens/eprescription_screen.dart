@@ -281,8 +281,14 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? ListView(children: [
-                  SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.5,
+                  // minHeight, not a fixed height. This state carries a button
+                  // as well as the message — about 290dp of content — and a
+                  // rigid fraction of a short screen clips it. Asking for the
+                  // space rather than insisting on it lets it grow with the
+                  // message and the system font.
+                  ConstrainedBox(
+                      constraints: BoxConstraints(
+                          minHeight: MediaQuery.of(context).size.height * 0.5),
                       child: AppEmptyState(
                         icon: Icons.cloud_off_rounded,
                         title: 'Could not load your records',
@@ -293,8 +299,9 @@ class _EPrescriptionScreenState extends State<EPrescriptionScreen> {
                 ])
               : _prescriptions.isEmpty
               ? ListView(children: [
-                  SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.5,
+                  ConstrainedBox(
+                      constraints: BoxConstraints(
+                          minHeight: MediaQuery.of(context).size.height * 0.5),
                       child: const AppEmptyState(
                         icon: Icons.medication_liquid_rounded,
                         title: 'Nothing from a doctor yet',
