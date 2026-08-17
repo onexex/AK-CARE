@@ -88,15 +88,24 @@ class AppButton extends StatelessWidget {
               valueColor: AlwaysStoppedAnimation<Color>(fg),
             ),
           )
-        : Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: 20, color: fg),
-                const SizedBox(width: AppSpacing.sm),
+        // A label wider than the button used to overflow: 'GET VERIFICATION
+        // CODE' with its icon wants 333px, and the sign-in card caps that row
+        // at 312 on every screen size, so the app's own front door showed the
+        // overflow stripes. Scaling down beats clipping a call to action —
+        // shrinking the words a little is recoverable, losing them is not. It
+        // does nothing to a label that already fits.
+        : FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 20, color: fg),
+                  const SizedBox(width: AppSpacing.sm),
+                ],
+                Text(label, style: _textStyle().copyWith(color: fg)),
               ],
-              Text(label, style: _textStyle().copyWith(color: fg)),
-            ],
+            ),
           );
 
     final button = variant == AppButtonVariant.secondary
