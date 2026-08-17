@@ -214,8 +214,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   return RefreshIndicator(
                     onRefresh: _onRefresh,
                     child: ListView(children: [
-                      SizedBox(
-                          height: MediaQuery.of(context).size.height * 0.4,
+                      ConstrainedBox(
+                          constraints: BoxConstraints(
+                              minHeight:
+                                  MediaQuery.of(context).size.height * 0.4),
                           child: AppEmptyState(
                             icon: _searchQuery.isNotEmpty
                                 ? Icons.search_off_rounded

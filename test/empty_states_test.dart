@@ -19,8 +19,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:akop_member_app/core/api.dart';
 import 'package:akop_member_app/design_system/app_theme.dart';
+import 'package:akop_member_app/screens/community_feed_screen.dart';
 import 'package:akop_member_app/screens/eprescription_screen.dart';
+import 'package:akop_member_app/screens/history_screen.dart';
 import 'package:akop_member_app/screens/medical_certs_screen.dart';
+import 'package:akop_member_app/screens/notifications_screen.dart';
+import 'package:akop_member_app/screens/request_status_screen.dart';
 
 /// Short enough that 0.4 and 0.5 of it cannot hold the state with its button.
 const _shortPhone = Size(360, 600);
@@ -113,6 +117,51 @@ void main() {
       await _showAt(tester, const EPrescriptionScreen());
 
       expect(find.text('Nothing from a doctor yet'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  // The rest of the sweep. None of these carry an action button, so each had
+  // the slack the two above did not — they are covered because a fixed height
+  // was the wrong tool everywhere, not because they were visibly broken.
+  group('the action-less states', () {
+    /// Every screen here answers an empty list; only the envelope differs.
+    void serveEmpty() {
+      Api.client = MockClient((_) async => http.Response(
+            jsonEncode({'status': 'success', 'data': [], 'notifications': []}),
+            200,
+          ));
+    }
+
+    testWidgets('teleconsult requests', (tester) async {
+      serveEmpty();
+      await _showAt(tester, const RequestStatusScreen(), textScale: 1.3);
+
+      expect(find.text('No Requests Yet'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('history', (tester) async {
+      serveEmpty();
+      await _showAt(tester, const HistoryScreen(), textScale: 1.3);
+
+      expect(find.text('No History Yet'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('notifications', (tester) async {
+      serveEmpty();
+      await _showAt(tester, const NotificationsScreen(), textScale: 1.3);
+
+      expect(find.text('No Notifications'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('community feed', (tester) async {
+      serveEmpty();
+      await _showAt(tester, const CommunityFeedScreen(), textScale: 1.3);
+
+      expect(find.text('No Posts Yet'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });

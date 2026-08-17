@@ -254,9 +254,11 @@ class _RequestStatusScreenState extends State<RequestStatusScreen> {
                     onRefresh: _fetchRequests,
                     child: filtered.isEmpty
                         ? ListView(children: [
-                            SizedBox(
-                                height:
-                                    MediaQuery.of(context).size.height * 0.4,
+                            ConstrainedBox(
+                                constraints: BoxConstraints(
+                                    minHeight:
+                                        MediaQuery.of(context).size.height *
+                                            0.4),
                                 child: AppEmptyState(
                                   icon: Icons.assignment_late_outlined,
                                   title: _requests.isEmpty

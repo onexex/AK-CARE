@@ -89,8 +89,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _notifications.isEmpty
               ? ListView(children: [
-                  SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.5,
+                  ConstrainedBox(
+                      constraints: BoxConstraints(
+                          minHeight: MediaQuery.of(context).size.height * 0.5),
                       child: const AppEmptyState(
                         icon: Icons.notifications_none_rounded,
                         title: 'No Notifications',

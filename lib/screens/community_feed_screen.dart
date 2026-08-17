@@ -162,8 +162,10 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                     ? RefreshIndicator(
                         onRefresh: () => _loadFeed(refresh: true),
                         child: ListView(children: [
-                          SizedBox(
-                              height: MediaQuery.of(context).size.height * 0.5,
+                          ConstrainedBox(
+                              constraints: BoxConstraints(
+                                  minHeight:
+                                      MediaQuery.of(context).size.height * 0.5),
                               child: const AppEmptyState(
                                 icon: Icons.forum_rounded,
                                 title: 'No Posts Yet',
