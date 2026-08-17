@@ -8,6 +8,7 @@ import '../design_system/app_typography.dart';
 import '../design_system/app_elevation.dart';
 import '../widgets/app_empty_state.dart';
 import '../models/news_article.dart';
+import '../models/campaign_activity.dart';
 
 class NewsScreen extends StatefulWidget {
   const NewsScreen({super.key});
@@ -23,7 +24,35 @@ class _NewsScreenState extends State<NewsScreen> {
   String _searchQuery = '';
   List<NewsArticle> _allNews = [];
 
-  @override void initState() { super.initState(); _newsFuture = _fetchNews(); }
+  /// What is coming up, shown above the stories.
+  ///
+  /// Kept out of [_newsFuture] deliberately: this is a second, independent
+  /// call, and a news outage should not take the activities down with it or
+  /// the other way round. Its own failure is quiet — the section simply does
+  /// not appear — because it is an addition to the screen, not the screen.
+  List<CampaignActivity> _activities = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _newsFuture = _fetchNews();
+    _loadActivities();
+  }
+
+  Future<void> _loadActivities() async {
+    try {
+      final data = await Api.get('get_activities.php');
+      if (data['status'] == 'success') {
+        final rows = (data['data'] as List? ?? [])
+            .map((e) =>
+                CampaignActivity.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList();
+        if (mounted) setState(() => _activities = rows);
+      }
+    } catch (_) {
+      // Left as it was. See the field doc above.
+    }
+  }
   @override void dispose() { _searchController.dispose(); super.dispose(); }
 
   /// Throws rather than returning an empty list on failure.
@@ -95,6 +124,7 @@ class _NewsScreenState extends State<NewsScreen> {
           return Padding(padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs), child: FilterChip(label: Text(_categories[i]), selected: sel, onSelected: (_) => setState(() => _selectedCategory = _categories[i]), backgroundColor: tc.surface, selectedColor: tc.primarySurface, checkmarkColor: tc.primary, labelStyle: AppTypography.labelMedium.copyWith(color: sel ? tc.primaryText : tc.textSecondary), side: BorderSide.none, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.full))));
         }))),
         const SizedBox(height: AppSpacing.sm),
+        _activitiesSection(tc),
         Expanded(child: FutureBuilder<List<NewsArticle>>(future: _newsFuture, builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
           // A failure is its own answer, and a retryable one. Falling through
@@ -135,4 +165,133 @@ Icon(Icons.chevron_right, color: tc.neutral50, size: 20),
   }
 
   Widget _placeholder(ThemeColors tc) => Container(width: 80, height: 80, decoration: BoxDecoration(color: tc.neutral20, borderRadius: BorderRadius.circular(AppRadius.sm)), child: Icon(Icons.article_rounded, color: tc.primary, size: 32));
+
+  /// The upcoming-activities strip that sits above the stories.
+  ///
+  /// Horizontal, so it costs the news a fixed band rather than however many
+  /// activities happen to be scheduled. Hidden while a search is running: the
+  /// member is looking for a story, and a row that ignores what they typed
+  /// would read as a broken search.
+  Widget _activitiesSection(ThemeColors tc) {
+    if (_activities.isEmpty || _searchQuery.isNotEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.sm),
+          child: Row(
+            children: [
+              Icon(Icons.event_available_rounded, size: 18, color: tc.primary),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text('Upcoming Activities',
+                    style: AppTypography.titleMedium.copyWith(color: tc.neutral100)),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          // Scaled, not fixed. The cards are sized to their text, so a band
+          // that ignores the system font setting is one that clips at the
+          // first notch above default.
+          height: 132 * _textScale(context),
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            itemCount: _activities.length,
+            itemBuilder: (context, i) => _activityCard(tc, _activities[i]),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+      ],
+    );
+  }
+
+  /// How far the member has turned the system font up, capped so a very large
+  /// setting stretches the band without swallowing the screen.
+  double _textScale(BuildContext context) =>
+      MediaQuery.textScaleFactorOf(context).clamp(1.0, 1.6);
+
+  Widget _activityCard(ThemeColors tc, CampaignActivity a) {
+    final start = DateTime.tryParse(a.scheduledAt);
+    final end = a.hasEndDate ? DateTime.tryParse(a.endsAt) : null;
+    final format = DateFormat('MMM dd');
+
+    // One string, not three widgets in a Row: a range plus the Near you chip
+    // could not fit the card once the text scaled, and a date is not worth an
+    // overflow.
+    final date = start == null
+        ? a.scheduledAt
+        : end == null
+            ? format.format(start)
+            : '${format.format(start)} – ${format.format(end)}';
+
+    return Container(
+      width: 220 * _textScale(context),
+      margin: const EdgeInsets.only(right: AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: tc.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        boxShadow: AppElevation.subtle,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Flexible(
+                child: Text(date,
+                    style: AppTypography.labelMedium.copyWith(color: tc.primary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              // Only ever an addition. A member whose address the server could
+              // not place sees the activities unmarked, never fewer of them.
+              if (a.nearYou)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: tc.primarySurface,
+                    borderRadius: BorderRadius.circular(AppRadius.full),
+                  ),
+                  child: Text('Near you',
+                      style: AppTypography.labelSmall.copyWith(color: tc.primaryText)),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(a.title,
+              style: AppTypography.titleMedium.copyWith(color: tc.neutral100),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 2),
+          if (a.typeLabel.isNotEmpty)
+            Text(a.typeLabel,
+                style: AppTypography.caption.copyWith(color: tc.textSecondary)),
+          const Spacer(),
+          if (a.where.isNotEmpty)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.place_outlined, size: 14, color: tc.neutral50),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(a.where,
+                      style: AppTypography.caption.copyWith(color: tc.textSecondary),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
 }

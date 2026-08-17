@@ -37,6 +37,51 @@ Map<String, dynamic> _article({
       'image_url': '',
     };
 
+/// One row shaped the way get_activities.php hands it back.
+Map<String, dynamic> _activity({
+  int id = 1,
+  String title = 'Medical mission',
+  String type = 'medical',
+  String scheduledAt = '2026-08-20 09:00:00',
+  String? endsAt,
+  String province = 'Batangas',
+  Object nearYou = 0,
+}) =>
+    {
+      'id': '$id',
+      'type': type,
+      'title': title,
+      'scheduled_at': scheduledAt,
+      'ends_at': endsAt,
+      'barangay': 'Santa Anastacia',
+      'city_municipality': 'City of Sto. Tomas',
+      'province': province,
+      'near_you': nearYou,
+      'contact_person': null,
+      'contact_number': null,
+    };
+
+/// Answers the news call and the activities call independently, so a test can
+/// fail one without the other — which is the whole point of them being two
+/// calls.
+http.Client _server({
+  Object? news,
+  Object? activities,
+  bool newsFails = false,
+  bool activitiesFail = false,
+}) =>
+    MockClient((request) async {
+      if (request.url.path.endsWith('get_activities.php')) {
+        if (activitiesFail) throw Exception('offline');
+        return http.Response(
+          jsonEncode({'status': 'success', 'data': activities ?? []}),
+          200,
+        );
+      }
+      if (newsFails) throw Exception('offline');
+      return http.Response(jsonEncode(news ?? []), 200);
+    });
+
 Future<void> _show(WidgetTester tester, Widget screen) async {
   await tester.pumpWidget(MaterialApp(theme: AppTheme.light, home: screen));
   await tester.pumpAndSettle();
@@ -124,10 +169,16 @@ void main() {
     });
 
     testWidgets('the retry goes back to the server', (tester) async {
-      var calls = 0;
-      Api.client = MockClient((_) async {
-        calls++;
-        if (calls == 1) throw Exception('offline');
+      // Counts the news calls only — the screen also asks for activities, and
+      // counting both would make the first news call look like the second.
+      var newsCalls = 0;
+      Api.client = MockClient((request) async {
+        if (request.url.path.endsWith('get_activities.php')) {
+          return http.Response(
+              jsonEncode({'status': 'success', 'data': []}), 200);
+        }
+        newsCalls++;
+        if (newsCalls == 1) throw Exception('offline');
         return http.Response(jsonEncode([_article()]), 200);
       });
 
@@ -138,7 +189,110 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Free check-ups this month'), findsOneWidget);
-      expect(calls, 2);
+      expect(newsCalls, 2);
+    });
+  });
+
+  group('Upcoming activities', () {
+    testWidgets('appear above the news', (tester) async {
+      Api.client = _server(
+        news: [_article()],
+        activities: [_activity(title: 'Medical mission')],
+      );
+
+      await _show(tester, const NewsScreen());
+
+      expect(find.text('Upcoming Activities'), findsOneWidget);
+      expect(find.text('Medical mission'), findsOneWidget);
+      expect(find.text('Santa Anastacia, City of Sto. Tomas, Batangas'),
+          findsOneWidget);
+      // The stories are still there underneath.
+      expect(find.text('Free check-ups this month'), findsOneWidget);
+    });
+
+    testWidgets('one in the member\'s province is marked, others are not',
+        (tester) async {
+      Api.client = _server(activities: [
+        _activity(id: 1, title: 'Near one', nearYou: 1),
+        _activity(id: 2, title: 'Far one', province: 'Zambales'),
+      ]);
+
+      await _show(tester, const NewsScreen());
+
+      expect(find.text('Near you'), findsOneWidget);
+      expect(find.text('Near one'), findsOneWidget);
+      expect(find.text('Far one'), findsOneWidget,
+          reason: 'proximity marks an activity, it never hides one');
+    });
+
+    testWidgets('the section keeps out of the way when there are none',
+        (tester) async {
+      Api.client = _server(news: [_article()], activities: []);
+
+      await _show(tester, const NewsScreen());
+
+      expect(find.text('Upcoming Activities'), findsNothing);
+      expect(find.text('Free check-ups this month'), findsOneWidget);
+    });
+
+    testWidgets('a search hides them, so the results are only what was asked',
+        (tester) async {
+      Api.client = _server(
+        news: [_article(title: 'Free check-ups this month')],
+        activities: [_activity(title: 'Medical mission')],
+      );
+
+      await _show(tester, const NewsScreen());
+      expect(find.text('Upcoming Activities'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField).first, 'check-ups');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Upcoming Activities'), findsNothing);
+      expect(find.text('Free check-ups this month'), findsOneWidget);
+    });
+
+    testWidgets('the two calls fail independently', (tester) async {
+      // Activities down, news up: the member still gets their stories rather
+      // than an error for something that is an addition to the screen.
+      Api.client = _server(news: [_article()], activitiesFail: true);
+
+      await _show(tester, const NewsScreen());
+
+      expect(find.text('Upcoming Activities'), findsNothing);
+      expect(find.text('Free check-ups this month'), findsOneWidget);
+      expect(find.text('Could not load the news'), findsNothing);
+    });
+
+    testWidgets('news down does not take the activities with it',
+        (tester) async {
+      Api.client = _server(activities: [_activity()], newsFails: true);
+
+      await _show(tester, const NewsScreen());
+
+      expect(find.text('Upcoming Activities'), findsOneWidget);
+      expect(find.text('Could not load the news'), findsOneWidget);
+    });
+
+    testWidgets('the strip holds together at a raised text scale',
+        (tester) async {
+      // The cards are a fixed 132dp tall, which is the kind of number that
+      // stops being enough the moment someone turns text size up.
+      tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      Api.client = _server(activities: [
+        _activity(title: 'Medical mission', endsAt: '2026-08-21 17:00:00'),
+      ]);
+
+      await _show(tester, const NewsScreen());
+
+      expect(find.text('Upcoming Activities'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 
