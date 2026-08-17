@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import '../core/config.dart';
+import '../core/api.dart';
 import '../core/session.dart';
 import '../design_system/theme_colors.dart';
 import '../design_system/app_radius.dart';
@@ -67,12 +65,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final response = await http.post(
-        Uri.parse(AppConfig.checkUserUrl),
+      final data = await Api.postPublic(
+        'check_user.php',
         body: {'phone_number': _phoneController.text.trim()},
-      ).timeout(AppConfig.apiTimeout);
+      );
       if (!mounted) return;
-      final data = json.decode(response.body);
       if (data['status'] == 'success') {
         setState(() => _isOtpSent = true);
         _otpFocusNodes[0].requestFocus();
@@ -98,15 +95,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final response = await http.post(
-        Uri.parse(AppConfig.verifyOtpUrl),
+      final data = await Api.postPublic(
+        'verify_otp.php',
         body: {
           'phone_number': _phoneController.text.trim(),
           'otp_code': _combinedOtp,
         },
-      ).timeout(AppConfig.apiTimeout);
+      );
       if (!mounted) return;
-      final data = json.decode(response.body);
       if (data['status'] == 'success') {
         // The token is the whole point of verifying: from here on the app
         // proves who it is instead of naming a member on every request. A

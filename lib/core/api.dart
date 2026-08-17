@@ -33,6 +33,21 @@ class Api {
   /// sign-in screen from wherever it happens to be. Set once, in main().
   static void Function()? onUnauthenticated;
 
+  /// The client every request goes through.
+  ///
+  /// Production never assigns this. It exists so a test can hand the app a
+  /// scripted server and drive a screen that only exists on the far side of a
+  /// network call — the sign-in OTP step was unreachable for exactly that
+  /// reason, and an 8px overflow lived there, on a screen every member passes
+  /// through, until someone happened to look at a handset.
+  ///
+  /// Tests must restore it; [resetClient] is the way, and `addTearDown` the
+  /// place, since a leaked fake would silently mute every later test.
+  static http.Client client = http.Client();
+
+  /// Puts [client] back to one that really talks to the network.
+  static void resetClient() => client = http.Client();
+
   static Future<Map<String, String>> _headers() async {
     final token = await Session.token();
     return {
@@ -50,8 +65,9 @@ class Api {
     final uri = Uri.parse('${AppConfig.baseUrl}/$path')
         .replace(queryParameters: query);
 
-    return _send(() async =>
-        http.get(uri, headers: await _headers()).timeout(AppConfig.apiTimeout));
+    return _send(() async => client
+        .get(uri, headers: await _headers())
+        .timeout(AppConfig.apiTimeout));
   }
 
   static Future<Map<String, dynamic>> post(
@@ -60,7 +76,7 @@ class Api {
   }) async {
     final uri = Uri.parse('${AppConfig.baseUrl}/$path');
 
-    return _send(() async => http
+    return _send(() async => client
         .post(uri, headers: await _headers(), body: body)
         .timeout(AppConfig.apiTimeout));
   }
@@ -72,8 +88,8 @@ class Api {
   }) async {
     final uri = Uri.parse('${AppConfig.baseUrl}/$path');
 
-    return _send(() async =>
-        http.post(uri, body: body).timeout(AppConfig.apiTimeout));
+    return _send(
+        () async => client.post(uri, body: body).timeout(AppConfig.apiTimeout));
   }
 
   static Future<String?> uploadImage(String path, String filePath) async {
@@ -84,7 +100,7 @@ class Api {
             ..files.add(await http.MultipartFile.fromPath('image', filePath));
 
       final res = await http.Response.fromStream(
-          await request.send().timeout(AppConfig.apiTimeout));
+          await client.send(request).timeout(AppConfig.apiTimeout));
 
       if (res.statusCode == 401) {
         await _signOut();

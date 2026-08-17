@@ -28,8 +28,11 @@ class AppConfig {
   static const String baseUrl = 'http://$_host/$_backendPath';
 
   // ── Endpoints ──
-  static const String checkUserUrl = '$baseUrl/check_user.php';
-  static const String verifyOtpUrl = '$baseUrl/verify_otp.php';
+  // Sign-in no longer has entries here: check_user and verify_otp go through
+  // Api.postPublic, which is what that method is for. A ready-made full URL is
+  // an invitation to reach for `http` directly and miss the timeout, the JSON
+  // handling and the one seam tests have — which is how the sign-in screen
+  // came to be untestable in the first place.
   static const String getHistoryUrl = '$baseUrl/get_history.php';
   static const String getNewsUrl = '$baseUrl/get_news.php';
 
