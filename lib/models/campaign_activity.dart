@@ -19,14 +19,6 @@ class CampaignActivity {
   final String cityMunicipality;
   final String province;
 
-  /// Whether this falls in the member's own province.
-  ///
-  /// Province, not city: the activities are few and spread thin, so a tighter
-  /// match would mark almost nothing and read as though it were broken. False
-  /// also covers the member whose address the server could not place, which is
-  /// why nothing is hidden on the strength of it.
-  final bool nearYou;
-
   final String contactPerson;
   final String contactNumber;
 
@@ -39,7 +31,6 @@ class CampaignActivity {
     required this.barangay,
     required this.cityMunicipality,
     required this.province,
-    required this.nearYou,
     required this.contactPerson,
     required this.contactNumber,
   });
@@ -74,8 +65,6 @@ class CampaignActivity {
       barangay: _str(json['barangay']),
       cityMunicipality: _str(json['city_municipality']),
       province: _str(json['province']),
-      // MySQL hands booleans back as 1/0 through this API.
-      nearYou: json['near_you'] == true || _str(json['near_you']) == '1',
       contactPerson: _str(json['contact_person']),
       contactNumber: _str(json['contact_number']),
     );

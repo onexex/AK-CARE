@@ -229,9 +229,9 @@ Icon(Icons.chevron_right, color: tc.neutral50, size: 20),
     final end = a.hasEndDate ? DateTime.tryParse(a.endsAt) : null;
     final format = DateFormat('MMM dd');
 
-    // One string, not three widgets in a Row: a range plus the Near you chip
-    // could not fit the card once the text scaled, and a date is not worth an
-    // overflow.
+    // One string rather than several widgets sharing a row, so a range can
+    // ellipsize as a unit when the system font is scaled up instead of
+    // overflowing the card.
     final date = start == null
         ? a.scheduledAt
         : end == null
@@ -250,30 +250,12 @@ Icon(Icons.chevron_right, color: tc.neutral50, size: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Flexible(
-                child: Text(date,
-                    style: AppTypography.labelMedium.copyWith(color: tc.primary),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              // Only ever an addition. A member whose address the server could
-              // not place sees the activities unmarked, never fewer of them.
-              if (a.nearYou)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: tc.primarySurface,
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                  ),
-                  child: Text('Near you',
-                      style: AppTypography.labelSmall.copyWith(color: tc.primaryText)),
-                ),
-            ],
-          ),
+          // Still ellipsizing: a scaled-up font turns 'Aug 17 – Aug 21' into
+          // more than the card's width whether or not anything sits beside it.
+          Text(date,
+              style: AppTypography.labelMedium.copyWith(color: tc.primary),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
           const SizedBox(height: AppSpacing.xs),
           Text(a.title,
               style: AppTypography.titleMedium.copyWith(color: tc.neutral100),

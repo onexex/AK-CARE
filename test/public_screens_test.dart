@@ -45,7 +45,6 @@ Map<String, dynamic> _activity({
   String scheduledAt = '2026-08-20 09:00:00',
   String? endsAt,
   String province = 'Batangas',
-  Object nearYou = 0,
 }) =>
     {
       'id': '$id',
@@ -56,7 +55,6 @@ Map<String, dynamic> _activity({
       'barangay': 'Santa Anastacia',
       'city_municipality': 'City of Sto. Tomas',
       'province': province,
-      'near_you': nearYou,
       'contact_person': null,
       'contact_number': null,
     };
@@ -211,19 +209,19 @@ void main() {
       expect(find.text('Free check-ups this month'), findsOneWidget);
     });
 
-    testWidgets('one in the member\'s province is marked, others are not',
+    testWidgets('every upcoming activity is shown, wherever it is',
         (tester) async {
+      // What survives the Near you chip being dropped: the screen never
+      // decided which activities a member should see, and still does not.
       Api.client = _server(activities: [
-        _activity(id: 1, title: 'Near one', nearYou: 1),
-        _activity(id: 2, title: 'Far one', province: 'Zambales'),
+        _activity(id: 1, title: 'One nearby', province: 'Bulacan'),
+        _activity(id: 2, title: 'One far off', province: 'Zambales'),
       ]);
 
       await _show(tester, const NewsScreen());
 
-      expect(find.text('Near you'), findsOneWidget);
-      expect(find.text('Near one'), findsOneWidget);
-      expect(find.text('Far one'), findsOneWidget,
-          reason: 'proximity marks an activity, it never hides one');
+      expect(find.text('One nearby'), findsOneWidget);
+      expect(find.text('One far off'), findsOneWidget);
     });
 
     testWidgets('the section keeps out of the way when there are none',
