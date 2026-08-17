@@ -75,10 +75,18 @@ class _NewsScreenState extends State<NewsScreen> {
     setState(() {
       _newsFuture = _fetchNews();
     });
-    // The FutureBuilder is what reports a failure; this await only holds the
-    // refresh spinner open, so its copy of the error is absorbed here rather
-    // than surfacing as an unhandled rejection.
-    await _newsFuture.catchError((_) => <NewsArticle>[]);
+    // Both, not just the news. A member pulling this screen down is asking it
+    // to be current, and a strip of activities that never moved would be the
+    // one stale thing left on a screen that just refreshed.
+    //
+    // The FutureBuilder is what reports a news failure; this await only holds
+    // the refresh spinner open, so its copy of the error is absorbed here
+    // rather than surfacing as an unhandled rejection. _loadActivities keeps
+    // its own failure quiet by design.
+    await Future.wait([
+      _newsFuture.catchError((_) => <NewsArticle>[]),
+      _loadActivities(),
+    ]);
   }
 
   /// The server's own words where there are any — 'check your connection'

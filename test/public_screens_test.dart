@@ -275,6 +275,33 @@ void main() {
       expect(find.text('Could not load the news'), findsOneWidget);
     });
 
+    testWidgets('pulling the screen down refreshes them too', (tester) async {
+      // A strip that never moved would be the one stale thing on a screen the
+      // member just asked to be current.
+      var activityCalls = 0;
+      Api.client = MockClient((request) async {
+        if (request.url.path.endsWith('get_activities.php')) {
+          activityCalls++;
+          return http.Response(
+              jsonEncode({
+                'status': 'success',
+                'data': [_activity(title: 'Medical mission')]
+              }),
+              200);
+        }
+        return http.Response(jsonEncode([_article()]), 200);
+      });
+
+      await _show(tester, const NewsScreen());
+      expect(activityCalls, 1);
+
+      await tester.fling(
+          find.text('Free check-ups this month'), const Offset(0, 300), 1000);
+      await tester.pumpAndSettle();
+
+      expect(activityCalls, 2, reason: 'the pull asked for them again');
+    });
+
     testWidgets('the strip holds together at a raised text scale',
         (tester) async {
       // The cards are a fixed 132dp tall, which is the kind of number that
