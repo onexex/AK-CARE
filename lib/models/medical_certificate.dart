@@ -7,7 +7,10 @@
 class MedicalCertificate {
   final int id;
   final String stage; // 'pending' | 'issued' | 'rejected'
-  final bool downloadable;
+
+  /// The server's word on whether a PDF may be produced — null when it did not
+  /// say. See [canDownload]; read that rather than this.
+  final bool? downloadable;
 
   /// What the member asked for, in their words.
   final String reason;
@@ -72,6 +75,19 @@ class MedicalCertificate {
 
   bool get isRejected => stage == 'rejected';
 
+  /// Whether to offer the PDF.
+  ///
+  /// The server sets [downloadable] when a request has been issued *and* carries
+  /// a certificate number, and the number is the point: the PDF prints it twice,
+  /// once as the document's own number and once in the line telling a reader how
+  /// to verify it. Rendering one without it produces a certificate that cannot
+  /// be checked — worse than no certificate, because it looks like a real one.
+  ///
+  /// A server too old to send the field is not read as a refusal; the same rule
+  /// is applied here instead, so the member is not stranded with a valid
+  /// certificate and no way to get it.
+  bool get canDownload => isIssued && (downloadable ?? certificateNo.isNotEmpty);
+
   bool get hasRestPeriod => restFrom.isNotEmpty && restTo.isNotEmpty;
 
   String get fitnessLabel => switch (fitness) {
@@ -87,9 +103,12 @@ class MedicalCertificate {
     return MedicalCertificate(
       id: int.tryParse(_str(json['id'])) ?? 0,
       stage: _str(json['stage']).isEmpty ? 'pending' : _str(json['stage']),
-      // MySQL hands booleans back as 1/0 through this API.
-      downloadable: json['downloadable'] == true ||
-          _str(json['downloadable']) == '1',
+      // MySQL hands booleans back as 1/0 through this API. Absent stays null:
+      // "not offered" and "never mentioned" are different answers.
+      downloadable: json.containsKey('downloadable') &&
+              json['downloadable'] != null
+          ? json['downloadable'] == true || _str(json['downloadable']) == '1'
+          : null,
       reason: _str(json['reason']),
       requestedAt: _str(json['created_at']),
       certificateNo: _str(json['certificate_no']),

@@ -35,10 +35,21 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
   /// than letting the member find out days later through a rejection.
   bool _hasConsultation = true;
 
+  /// Outlives the request sheet on purpose: a member whose submission failed, or
+  /// who swiped the sheet away mid-sentence, gets their wording back instead of
+  /// retyping it. Cleared once a request is actually filed.
+  final TextEditingController _reasonCtrl = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     _loadRequests();
+  }
+
+  @override
+  void dispose() {
+    _reasonCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadRequests() async {
@@ -138,6 +149,12 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
 
             _detailRow(tc, 'Your reason', cert.reason),
 
+            // How long this has been sitting there. It matters most while the
+            // request is pending — "is anyone looking at this?" is the question
+            // the screen was leaving unanswered.
+            if (cert.requestedAt.isNotEmpty)
+              _detailRow(tc, 'Requested', formatDate(cert.requestedAt)),
+
             if (cert.isIssued) ...[
               if (cert.patientName.isNotEmpty)
                 _detailRow(tc, 'Patient', cert.patientName),
@@ -169,12 +186,20 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
               if (cert.issuedAt.isNotEmpty)
                 _detailRow(tc, 'Issued on', formatDate(cert.issuedAt)),
               const SizedBox(height: AppSpacing.lg),
-              AppButton(
-                label: 'DOWNLOAD PDF',
-                icon: Icons.download_rounded,
-                isFullWidth: true,
-                onPressed: () => _downloadPdf(cert),
-              ),
+              // Gated on the same rule as the list's PDF icon, so the row and
+              // the sheet cannot promise different things about one certificate.
+              if (cert.canDownload)
+                AppButton(
+                  label: 'DOWNLOAD PDF',
+                  icon: Icons.download_rounded,
+                  isFullWidth: true,
+                  onPressed: () => _downloadPdf(cert),
+                )
+              else
+                Text(
+                    'This certificate has not been given a certificate number yet, so it cannot be downloaded — a copy without one cannot be verified. Contact support if it stays this way.',
+                    style: AppTypography.bodyMedium
+                        .copyWith(color: tc.textSecondary)),
             ] else if (cert.isRejected) ...[
               if (cert.rejectionReason.isNotEmpty)
                 _detailRow(tc, 'Reason given', cert.rejectionReason),
@@ -214,8 +239,13 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
   }
 
   void _showRequestForm() {
-    final reasonCtrl = TextEditingController();
     bool isSaving = false;
+
+    // Whatever stopped the request going through, shown under the field. It
+    // stays in the sheet rather than becoming a snackbar behind a dismissed
+    // form: the member has to act on it, and to act on it they need the words
+    // they wrote still in front of them.
+    String? formError;
 
     showModalBottomSheet(
       context: context,
@@ -269,17 +299,31 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
                   Text('Reason', style: AppTypography.labelMedium.copyWith(color: tc.neutral80)),
                   const SizedBox(height: AppSpacing.sm),
                   TextField(
-                    controller: reasonCtrl, maxLines: 3,
+                    controller: _reasonCtrl, maxLines: 3,
                     enabled: !isSaving,
-                    decoration: const InputDecoration(hintText: 'e.g. Employment, School, Travel...'),
+                    decoration: InputDecoration(
+                      hintText: 'e.g. Employment, School, Travel...',
+                      errorText: formError,
+                      errorMaxLines: 3,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.xxl),
                   AppButton(
                     label: 'SUBMIT REQUEST', icon: Icons.send_rounded,
                     isLoading: isSaving,
                     onPressed: isSaving ? null : () async {
-                      if (reasonCtrl.text.trim().isEmpty) return;
-                      setModalState(() => isSaving = true);
+                      final reason = _reasonCtrl.text.trim();
+                      if (reason.isEmpty) {
+                        // Was a silent no-op: the button appeared broken.
+                        setModalState(() => formError =
+                            'Tell the doctor what the certificate is for.');
+                        return;
+                      }
+
+                      setModalState(() {
+                        isSaving = true;
+                        formError = null;
+                      });
 
                       // Resolved before the async gap; the sheet's context is
                       // defunct once it has been popped.
@@ -289,17 +333,47 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
                       try {
                         final result = await Api.post(
                           'medical_certs.php',
-                          body: {'reason': reasonCtrl.text.trim()},
+                          body: {'reason': reason},
                         );
+
+                        // A request the server declined — already one pending,
+                        // say — has not been filed, so the form stays up with
+                        // the reason why.
+                        if (result['status'] != 'success') {
+                          if (ctx.mounted) {
+                            setModalState(() {
+                              isSaving = false;
+                              formError = result['message']?.toString() ??
+                                  'The server did not accept this request.';
+                            });
+                          }
+                          return;
+                        }
+
+                        _reasonCtrl.clear();
                         navigator.pop();
                         messenger.showSnackBar(SnackBar(
-                          content: Text(result['message'] ?? 'Request submitted'),
-                          backgroundColor: result['status'] == 'success' ? tc.success : tc.error,
+                          content: Text(
+                              result['message']?.toString() ?? 'Request submitted'),
+                          backgroundColor: tc.success,
                           behavior: SnackBarBehavior.floating,
                         ));
                         if (mounted) _loadRequests();
+                      } on ApiException catch (e) {
+                        if (ctx.mounted) {
+                          setModalState(() {
+                            isSaving = false;
+                            formError = e.message;
+                          });
+                        }
                       } catch (_) {
-                        if (ctx.mounted) setModalState(() => isSaving = false);
+                        if (ctx.mounted) {
+                          setModalState(() {
+                            isSaving = false;
+                            formError =
+                                'Could not reach the server. Check your connection and try again.';
+                          });
+                        }
                       }
                     },
                   ),
@@ -392,9 +466,19 @@ class _MedicalCertsScreenState extends State<MedicalCertsScreen> {
                                     decoration: BoxDecoration(color: stageColor.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
                                     child: Text(stageLabel, style: AppTypography.labelSmall.copyWith(color: stageColor)),
                                   ),
-                                  if (r.downloadable) ...[
+                                  if (r.canDownload) ...[
                                     const SizedBox(width: AppSpacing.sm),
                                     Icon(Icons.picture_as_pdf_rounded, size: 14, color: tc.textSecondary),
+                                  ],
+                                  if (r.requestedAt.isNotEmpty) ...[
+                                    const SizedBox(width: AppSpacing.sm),
+                                    Flexible(
+                                      child: Text(formatRelativeDate(r.requestedAt),
+                                          style: AppTypography.labelSmall
+                                              .copyWith(color: tc.textSecondary),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis),
+                                    ),
                                   ],
                                 ]),
                               ]),
