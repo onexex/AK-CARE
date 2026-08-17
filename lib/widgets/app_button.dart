@@ -88,12 +88,14 @@ class AppButton extends StatelessWidget {
               valueColor: AlwaysStoppedAnimation<Color>(fg),
             ),
           )
-        // A label wider than the button used to overflow: 'GET VERIFICATION
-        // CODE' with its icon wants 333px, and the sign-in card caps that row
-        // at 312 on every screen size, so the app's own front door showed the
-        // overflow stripes. Scaling down beats clipping a call to action —
-        // shrinking the words a little is recoverable, losing them is not. It
-        // does nothing to a label that already fits.
+        // A label too wide for the button overflows rather than shrinking, and
+        // the margins here are thin: 'GET VERIFICATION CODE' and its icon
+        // measure about 199pt into the 224pt the sign-in card allows on a 360pt
+        // phone. That fits today, but roughly 12% of font scaling spends the
+        // difference, and a member who has turned text size up is exactly the
+        // member who cannot afford a clipped instruction. Scaling down beats
+        // clipping a call to action — shrinking the words is recoverable,
+        // losing them is not. It does nothing to a label that already fits.
         : FittedBox(
             fit: BoxFit.scaleDown,
             child: Row(

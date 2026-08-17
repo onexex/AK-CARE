@@ -102,10 +102,12 @@ void main() {
 
   testWidgets('the sign-in screen lays out on the narrowest phone in use',
       (tester) async {
-    // 'GET VERIFICATION CODE' and its icon want 333px; the sign-in card caps
-    // that row at 312 whatever the screen, so this button overflowed on every
-    // device until AppButton was made to scale a long label down. Nothing had
-    // ever rendered it in a test, so nothing said so.
+    // Read this as a deliberately pessimistic guard, not a device simulation.
+    // flutter_test draws with a placeholder font whose every glyph is a 1em
+    // box, so 'GET VERIFICATION CODE' measures ~333pt here against ~199pt in
+    // Roboto on a real handset. Layout that survives at 320pt under that font
+    // has room to spare in the member's hands — and the margin it is spending
+    // is the same one Android font scaling eats into.
     tester.view.physicalSize = const Size(320, 568);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
