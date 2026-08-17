@@ -26,18 +26,37 @@ class _NewsScreenState extends State<NewsScreen> {
   @override void initState() { super.initState(); _newsFuture = _fetchNews(); }
   @override void dispose() { _searchController.dispose(); super.dispose(); }
 
+  /// Throws rather than returning an empty list on failure.
+  ///
+  /// It used to swallow everything, which told a member with no signal the
+  /// same thing it told a member on a quiet news week: 'No News'. One of those
+  /// is worth retrying and the other is not, and the screen was hiding which.
   Future<List<NewsArticle>> _fetchNews() async {
-    try {
-      // getList, not get: this endpoint answers with a bare array rather than
-      // the {status, data} envelope the rest of the API uses.
-      final data = await Api.getList('get_news.php');
-      _allNews = data.map((e) => NewsArticle.fromJson(e)).toList();
-      return _allNews;
-    } catch (_) {}
-    return [];
+    // getList, not get: this endpoint answers with a bare array rather than
+    // the {status, data} envelope the rest of the API uses.
+    final data = await Api.getList('get_news.php');
+    _allNews = data.map((e) => NewsArticle.fromJson(e)).toList();
+    return _allNews;
   }
 
-  Future<void> _onRefresh() async { setState(() => _newsFuture = _fetchNews()); await _newsFuture; }
+  Future<void> _onRefresh() async {
+    // A block body, not an arrow: `() => _newsFuture = _fetchNews()` returns
+    // the assigned Future, and setState asserts against a callback that
+    // returns one. Every pull-to-refresh here threw in debug builds.
+    setState(() {
+      _newsFuture = _fetchNews();
+    });
+    // The FutureBuilder is what reports a failure; this await only holds the
+    // refresh spinner open, so its copy of the error is absorbed here rather
+    // than surfacing as an unhandled rejection.
+    await _newsFuture.catchError((_) => <NewsArticle>[]);
+  }
+
+  /// The server's own words where there are any — 'check your connection'
+  /// tells a member what to do, where a bare failure does not.
+  String _failureText(Object? error) => error is ApiException
+      ? error.message
+      : 'Something went wrong loading the news.';
 
   List<NewsArticle> _filtered(List<NewsArticle> news) {
     return news.where((a) {
@@ -78,6 +97,27 @@ class _NewsScreenState extends State<NewsScreen> {
         const SizedBox(height: AppSpacing.sm),
         Expanded(child: FutureBuilder<List<NewsArticle>>(future: _newsFuture, builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+          // A failure is its own answer, and a retryable one. Falling through
+          // to 'No News' here is what made an unreachable server look like a
+          // quiet news week.
+          if (snapshot.hasError) {
+            return RefreshIndicator(onRefresh: _onRefresh, child: ListView(children: [
+              // minHeight, not a fixed height: this state carries a button as
+              // well as the message, and a rigid fraction of a short screen
+              // clips it. Asking for the space rather than insisting on it
+              // lets it grow when the text or the system font does.
+              ConstrainedBox(
+                constraints: BoxConstraints(minHeight: MediaQuery.of(context).size.height * 0.4),
+                child: AppEmptyState(
+                  icon: Icons.cloud_off_rounded,
+                  title: 'Could not load the news',
+                  subtitle: _failureText(snapshot.error),
+                  actionLabel: 'Try Again',
+                  onAction: _onRefresh,
+                ),
+              ),
+            ]));
+          }
           final newsList = _filtered(snapshot.hasData ? snapshot.data! : []);
           if (newsList.isEmpty) return RefreshIndicator(onRefresh: _onRefresh, child: ListView(children: [SizedBox(height: MediaQuery.of(context).size.height * 0.4, child: AppEmptyState(icon: _searchQuery.isNotEmpty ? Icons.search_off_rounded : Icons.newspaper_rounded, title: _searchQuery.isNotEmpty ? 'No Results' : 'No News', subtitle: _searchQuery.isNotEmpty ? 'Try a different search term.' : 'Stay tuned for the latest updates.'))]));
           return RefreshIndicator(onRefresh: _onRefresh, child: ListView.builder(padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.xxxl), itemCount: newsList.length, itemBuilder: (context, i) {

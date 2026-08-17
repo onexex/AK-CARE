@@ -85,13 +85,60 @@ void main() {
           reason: 'an enveloped body is not the shape this endpoint sends');
     });
 
-    testWidgets('an unreachable server leaves the screen standing',
+    testWidgets('an unreachable server says so, and offers a retry',
         (tester) async {
       Api.client = MockClient((_) async => throw Exception('offline'));
 
       await _show(tester, const NewsScreen());
 
+      expect(find.text('Could not load the news'), findsOneWidget);
+      expect(find.text('Try Again'), findsOneWidget);
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a quiet news week is not dressed up as a failure',
+        (tester) async {
+      // The other half of the distinction. An empty list is a real answer and
+      // must keep reading as one.
+      Api.client =
+          MockClient((_) async => http.Response(jsonEncode([]), 200));
+
+      await _show(tester, const NewsScreen());
+
+      expect(find.text('No News'), findsOneWidget);
+      expect(find.text('Could not load the news'), findsNothing);
+    });
+
+    testWidgets('a body that is not JSON reads as a failure, not as no news',
+        (tester) async {
+      // Exactly what get_news.php sends today when the table is empty: it
+      // echoes '0 results' and then the array, so the body is '0 results[]'.
+      // Until that is fixed server-side this is a failure, and the screen now
+      // says so instead of quietly showing an empty shelf.
+      Api.client = MockClient((_) async => http.Response('0 results[]', 200));
+
+      await _show(tester, const NewsScreen());
+
+      expect(find.text('Could not load the news'), findsOneWidget);
+      expect(find.text('No News'), findsNothing);
+    });
+
+    testWidgets('the retry goes back to the server', (tester) async {
+      var calls = 0;
+      Api.client = MockClient((_) async {
+        calls++;
+        if (calls == 1) throw Exception('offline');
+        return http.Response(jsonEncode([_article()]), 200);
+      });
+
+      await _show(tester, const NewsScreen());
+      expect(find.text('Could not load the news'), findsOneWidget);
+
+      await tester.tap(find.text('Try Again'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Free check-ups this month'), findsOneWidget);
+      expect(calls, 2);
     });
   });
 
