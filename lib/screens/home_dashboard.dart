@@ -17,6 +17,7 @@ import 'perks_screen.dart';
 import 'profile_screen.dart';
 import 'community_feed_screen.dart';
 import 'notifications_screen.dart';
+import 'member_qr_screen.dart';
 
 class HomeDashboard extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -187,6 +188,13 @@ class _HomeDashboardState extends State<HomeDashboard> {
         title: Text('AK MIYEMBRO',
             style: AppTypography.titleLarge.copyWith(color: Colors.white, letterSpacing: 1)),
         actions: [
+          // The counter is where this app gets used, so the member's scannable
+          // code is one tap from the first screen rather than buried in Profile.
+          IconButton(
+            icon: const Icon(Icons.qr_code_2_rounded, size: 22),
+            tooltip: 'My QR code',
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MemberQrScreen(userData: widget.userData))),
+          ),
           Stack(children: [
             IconButton(
               icon: const Icon(Icons.notifications_outlined, size: 22),

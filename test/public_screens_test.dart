@@ -45,6 +45,7 @@ Map<String, dynamic> _activity({
   String scheduledAt = '2026-08-20 09:00:00',
   String? endsAt,
   String province = 'Batangas',
+  Object? distanceKm,
 }) =>
     {
       'id': '$id',
@@ -57,6 +58,9 @@ Map<String, dynamic> _activity({
       'province': province,
       'contact_person': null,
       'contact_number': null,
+      // Absent for a member the server could not place, which is why the row
+      // has to read without it as well.
+      'distance_km': distanceKm,
     };
 
 /// Answers the news call and the activities call independently, so a test can
@@ -209,19 +213,41 @@ void main() {
       expect(find.text('Free check-ups this month'), findsOneWidget);
     });
 
-    testWidgets('every upcoming activity is shown, wherever it is',
+    testWidgets('whatever the server sends is shown, and only that',
         (tester) async {
-      // What survives the Near you chip being dropped: the screen never
-      // decided which activities a member should see, and still does not.
+      // Which activities are near enough is get_activities.php's question —
+      // it filters to 20 km before answering. The screen does not second-guess
+      // the list, and must not start: a row it hid would be one nobody could
+      // explain the absence of.
       Api.client = _server(activities: [
         _activity(id: 1, title: 'One nearby', province: 'Bulacan'),
-        _activity(id: 2, title: 'One far off', province: 'Zambales'),
+        _activity(id: 2, title: 'One further out', province: 'Zambales'),
       ]);
 
       await _show(tester, const NewsScreen());
 
       expect(find.text('One nearby'), findsOneWidget);
-      expect(find.text('One far off'), findsOneWidget);
+      expect(find.text('One further out'), findsOneWidget);
+    });
+
+    testWidgets('how far away shares the line with the kind', (tester) async {
+      Api.client = _server(activities: [_activity(distanceKm: 3.2)]);
+
+      await _show(tester, const NewsScreen());
+
+      expect(find.text('Medical · 3.2 km away'), findsOneWidget);
+    });
+
+    testWidgets('a distance the server could not measure is simply absent',
+        (tester) async {
+      // A member with no address on file gets the unfiltered list and no
+      // distances with it. '0 km away' would be a lie; nothing is the truth.
+      Api.client = _server(activities: [_activity()]);
+
+      await _show(tester, const NewsScreen());
+
+      expect(find.text('Medical'), findsOneWidget);
+      expect(find.textContaining('km away'), findsNothing);
     });
 
     testWidgets('the section keeps out of the way when there are none',

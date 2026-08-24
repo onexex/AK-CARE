@@ -176,6 +176,10 @@ Icon(Icons.chevron_right, color: tc.neutral50, size: 20),
 
   /// The upcoming-activities strip that sits above the stories.
   ///
+  /// Only what is within reach: the server drops anything further than 20 km
+  /// from the member's address before it answers, so a member in Bulacan is
+  /// not invited to a medical mission in Batangas.
+  ///
   /// Horizontal, so it costs the news a fixed band rather than however many
   /// activities happen to be scheduled. Hidden while a search is running: the
   /// member is looking for a story, and a row that ignores what they typed
@@ -238,6 +242,13 @@ Icon(Icons.chevron_right, color: tc.neutral50, size: 20),
             ? format.format(start)
             : '${format.format(start)} – ${format.format(end)}';
 
+    // 'Medical · 8.8 km away'. Either half may be missing; joining what is
+    // there beats printing a stray separator.
+    final subtitle = [
+      if (a.typeLabel.isNotEmpty) a.typeLabel,
+      if (a.distanceLabel.isNotEmpty) a.distanceLabel,
+    ].join(' · ');
+
     return Container(
       width: 220 * _textScale(context),
       margin: const EdgeInsets.only(right: AppSpacing.md),
@@ -262,9 +273,14 @@ Icon(Icons.chevron_right, color: tc.neutral50, size: 20),
               maxLines: 1,
               overflow: TextOverflow.ellipsis),
           const SizedBox(height: 2),
-          if (a.typeLabel.isNotEmpty)
-            Text(a.typeLabel,
-                style: AppTypography.caption.copyWith(color: tc.textSecondary)),
+          // Kind and distance share a line rather than taking one each: the
+          // card is sized to its text and a fourth row is what pushes the
+          // location off the bottom at a scaled-up font.
+          if (subtitle.isNotEmpty)
+            Text(subtitle,
+                style: AppTypography.caption.copyWith(color: tc.textSecondary),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
           const Spacer(),
           if (a.where.isNotEmpty)
             Row(

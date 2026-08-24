@@ -13,6 +13,7 @@ import '../widgets/app_section_header.dart';
 import '../widgets/app_button.dart';
 import '../core/theme_controller.dart';
 import 'login_screen.dart';
+import 'member_qr_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -130,6 +131,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 value: tc.isDark,
                 onChanged: (_) => themeController.toggle(),
               )),
+          const SizedBox(height: AppSpacing.sm),
+          _actionTile(Icons.qr_code_2_rounded, 'My QR Code', () => Navigator.push(context, MaterialPageRoute(builder: (_) => MemberQrScreen(userData: _user))), tc,
+              trailing: Icon(Icons.chevron_right, color: tc.neutral50, size: 20)),
           const SizedBox(height: AppSpacing.sm),
           _actionTile(Icons.edit_outlined, 'Edit Profile Information', _showEditSheet, tc,
               trailing: Icon(Icons.chevron_right, color: tc.neutral50, size: 20)),

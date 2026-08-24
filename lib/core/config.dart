@@ -19,7 +19,9 @@ class AppConfig {
   //
   // The LAN option is preferred when it works, but the handset and this laptop
   // currently sit on the same subnet with no route between them.
-  static const String _host = 'localhost:8080';
+  // static const String _host = 'localhost:8080';
+  // static const String _host = 'localhost:8080';
+  static const String _host = '192.168.35.129';
 
   // ── PHP Backend Path ──
   static const String _backendPath = 'akop_member';

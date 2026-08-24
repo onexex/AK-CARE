@@ -22,6 +22,14 @@ class CampaignActivity {
   final String contactPerson;
   final String contactNumber;
 
+  /// How far the activity is from the member, in kilometres, as the server
+  /// measured it.
+  ///
+  /// Null when it could not be measured — the member has no address on file,
+  /// or the activity has no pin and no barangay. Those rows are still listed;
+  /// an unknown distance is not the same as a far one.
+  final double? distanceKm;
+
   const CampaignActivity({
     required this.id,
     required this.type,
@@ -33,6 +41,7 @@ class CampaignActivity {
     required this.province,
     required this.contactPerson,
     required this.contactNumber,
+    this.distanceKm,
   });
 
   /// 'Tree planting' from 'tree_planting'. An unrecognised kind is shown as
@@ -53,7 +62,16 @@ class CampaignActivity {
 
   bool get hasEndDate => endsAt.isNotEmpty;
 
+  /// '8.8 km away', or '' when the server could not place it.
+  String get distanceLabel => distanceKm == null
+      ? ''
+      : '${distanceKm!.toStringAsFixed(distanceKm! < 10 ? 1 : 0)} km away';
+
   static String _str(dynamic v) => v?.toString() ?? '';
+
+  /// MySQL hands decimals back as strings, so this reads either.
+  static double? _num(dynamic v) =>
+      v == null ? null : double.tryParse(v.toString());
 
   factory CampaignActivity.fromJson(Map<String, dynamic> json) {
     return CampaignActivity(
@@ -67,6 +85,7 @@ class CampaignActivity {
       province: _str(json['province']),
       contactPerson: _str(json['contact_person']),
       contactNumber: _str(json['contact_number']),
+      distanceKm: _num(json['distance_km']),
     );
   }
 }
